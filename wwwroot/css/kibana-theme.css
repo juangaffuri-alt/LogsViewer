@@ -1,0 +1,526 @@
+/* Kibana Professional Theme for Area52 */
+
+:root {
+    --kibana-primary: #1f78d1;
+    --kibana-secondary: #017cba;
+    --kibana-neutral-100: #fafbfc;
+    --kibana-neutral-200: #f0f3f6;
+    --kibana-neutral-300: #e2e5e9;
+    --kibana-neutral-400: #c2c6cc;
+    --kibana-neutral-500: #999ca3;
+    --kibana-neutral-600: #646a73;
+    --kibana-neutral-700: #434954;
+    --kibana-neutral-800: #25282d;
+    --kibana-neutral-900: #1a1d21;
+    --kibana-error: #d82c0d;
+    --kibana-warning: #f5a700;
+    --kibana-success: #33a652;
+    --kibana-info: #0078d4;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    width: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--kibana-neutral-700);
+    background-color: var(--kibana-neutral-100);
+    overflow: hidden;
+}
+
+/* Main Container */
+.kibana-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+    background-color: var(--kibana-neutral-100);
+}
+
+/* Navbar */
+.kibana-navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: var(--kibana-primary);
+    padding: 0 20px;
+    height: 60px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    gap: 20px;
+    flex-shrink: 0;
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    font-size: 1.25rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.navbar-brand i {
+    font-size: 1.5rem;
+}
+
+.navbar-search {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.15);
+    padding: 0 12px;
+    border-radius: 4px;
+    height: 36px;
+}
+
+.navbar-search i {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.search-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: white;
+    padding: 0 10px;
+    outline: none;
+    font-size: 14px;
+}
+
+.search-input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.navbar-menu {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.navbar-menu .nav-link {
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.navbar-menu .nav-link:hover,
+.navbar-menu .nav-link.active {
+    color: white;
+}
+
+.navbar-actions {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.btn-icon {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 8px;
+    transition: all 0.2s ease;
+}
+
+.btn-icon:hover {
+    color: white;
+}
+
+/* Main Layout */
+.kibana-main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Sidebar */
+.kibana-sidebar {
+    width: 280px;
+    background-color: var(--kibana-neutral-100);
+    border-right: 1px solid var(--kibana-neutral-300);
+    padding: 20px 0;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.sidebar-section {
+    padding: 0 20px;
+    margin-bottom: 30px;
+}
+
+.sidebar-section h6 {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--kibana-neutral-600);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.filter-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--kibana-neutral-700);
+}
+
+.form-control {
+    border: 1px solid var(--kibana-neutral-300);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 13px;
+    background-color: white;
+    color: var(--kibana-neutral-700);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--kibana-primary);
+    box-shadow: 0 0 0 2px rgba(31, 120, 209, 0.1);
+}
+
+/* Quick Filters */
+.quick-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.quick-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.quick-filter input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.filter-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-badge.error {
+    background-color: rgba(216, 44, 13, 0.1);
+    color: var(--kibana-error);
+}
+
+.filter-badge.error:hover {
+    background-color: rgba(216, 44, 13, 0.15);
+}
+
+.filter-badge.warning {
+    background-color: rgba(245, 167, 0, 0.1);
+    color: var(--kibana-warning);
+}
+
+.filter-badge.warning:hover {
+    background-color: rgba(245, 167, 0, 0.15);
+}
+
+.filter-badge.info {
+    background-color: rgba(0, 120, 212, 0.1);
+    color: var(--kibana-info);
+}
+
+.filter-badge.info:hover {
+    background-color: rgba(0, 120, 212, 0.15);
+}
+
+.filter-badge.debug {
+    background-color: rgba(100, 106, 115, 0.1);
+    color: var(--kibana-neutral-700);
+}
+
+.filter-badge.debug:hover {
+    background-color: rgba(100, 106, 115, 0.15);
+}
+
+/* Saved Searches */
+.saved-searches {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.saved-search-link {
+    color: var(--kibana-primary);
+    text-decoration: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.saved-search-link:hover {
+    background-color: rgba(31, 120, 209, 0.1);
+}
+
+/* Content Area */
+.kibana-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: var(--kibana-neutral-100);
+}
+
+.content-wrapper {
+    flex: 1;
+    padding: 30px;
+    overflow-y: auto;
+    background-color: var(--kibana-neutral-100);
+}
+
+/* Modal */
+.kibana-modal {
+    border: 1px solid var(--kibana-neutral-300);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.kibana-modal .modal-header {
+    background-color: var(--kibana-neutral-100);
+    border-bottom: 1px solid var(--kibana-neutral-300);
+    padding: 15px 20px;
+}
+
+.kibana-modal .modal-body {
+    padding: 20px;
+    color: var(--kibana-neutral-700);
+}
+
+.kibana-modal .modal-footer {
+    background-color: var(--kibana-neutral-100);
+    border-top: 1px solid var(--kibana-neutral-300);
+    padding: 15px 20px;
+}
+
+/* Buttons */
+.btn {
+    padding: 10px 16px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    background-color: var(--kibana-primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: var(--kibana-secondary);
+}
+
+.btn-secondary {
+    background-color: var(--kibana-neutral-300);
+    color: var(--kibana-neutral-700);
+}
+
+.btn-secondary:hover {
+    background-color: var(--kibana-neutral-400);
+}
+
+.btn-danger {
+    background-color: var(--kibana-error);
+    color: white;
+}
+
+.btn-success {
+    background-color: var(--kibana-success);
+    color: white;
+}
+
+.btn-warning {
+    background-color: var(--kibana-warning);
+    color: white;
+}
+
+/* Cards */
+.card {
+    border: 1px solid var(--kibana-neutral-300);
+    border-radius: 4px;
+    background-color: white;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    margin-bottom: 20px;
+}
+
+.card-header {
+    background-color: var(--kibana-neutral-100);
+    border-bottom: 1px solid var(--kibana-neutral-300);
+    padding: 15px 20px;
+    font-weight: 600;
+    color: var(--kibana-neutral-700);
+}
+
+.card-body {
+    padding: 20px;
+}
+
+/* Tables */
+.table {
+    background-color: white;
+    border-collapse: collapse;
+}
+
+.table thead {
+    background-color: var(--kibana-neutral-100);
+}
+
+.table th {
+    padding: 12px 15px;
+    color: var(--kibana-neutral-600);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    border-bottom: 2px solid var(--kibana-neutral-300);
+}
+
+.table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--kibana-neutral-300);
+    color: var(--kibana-neutral-700);
+}
+
+.table tbody tr:hover {
+    background-color: var(--kibana-neutral-100);
+}
+
+/* Badges */
+.badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.badge-primary {
+    background-color: rgba(31, 120, 209, 0.1);
+    color: var(--kibana-primary);
+}
+
+.badge-danger {
+    background-color: rgba(216, 44, 13, 0.1);
+    color: var(--kibana-error);
+}
+
+.badge-warning {
+    background-color: rgba(245, 167, 0, 0.1);
+    color: var(--kibana-warning);
+}
+
+.badge-success {
+    background-color: rgba(51, 166, 82, 0.1);
+    color: var(--kibana-success);
+}
+
+/* Utility Classes */
+.text-muted {
+    color: var(--kibana-neutral-500);
+}
+
+.text-dark {
+    color: var(--kibana-neutral-800);
+}
+
+.text-primary {
+    color: var(--kibana-primary);
+}
+
+.bg-light {
+    background-color: var(--kibana-neutral-100);
+}
+
+.bg-white {
+    background-color: white;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .kibana-navbar {
+        flex-direction: column;
+        height: auto;
+        gap: 10px;
+    }
+
+    .navbar-search {
+        width: 100%;
+    }
+
+    .navbar-menu {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .kibana-main {
+        flex-direction: column;
+    }
+
+    .kibana-sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--kibana-neutral-300);
+    }
+
+    .content-wrapper {
+        padding: 15px;
+    }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--kibana-neutral-100);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--kibana-neutral-400);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--kibana-neutral-500);
+}

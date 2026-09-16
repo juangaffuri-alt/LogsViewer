@@ -1,0 +1,106 @@
+﻿@model DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard - Area 52";
+}
+
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fa fa-bar-chart"></i> Dashboard</h1>
+        <div class="header-controls">
+            <select class="form-control form-control-sm" id="dashboard-timerange" style="max-width: 150px;">
+                <option value="1h">Última hora</option>
+                <option value="24h" selected>Últimas 24 horas</option>
+                <option value="7d">Últimos 7 días</option>
+                <option value="30d">Últimos 30 días</option>
+            </select>
+            <button class="btn btn-sm btn-outline-secondary" id="btn-refresh-dashboard">
+                <i class="fa fa-refresh"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-value error">@Model.Statistics.ErrorCount</div>
+            <div class="kpi-label">Errores</div>
+            <div class="kpi-percentage">@Model.Statistics.ErrorPercentage.ToString("F1")%</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value warning">@Model.Statistics.WarningCount</div>
+            <div class="kpi-label">Advertencias</div>
+            <div class="kpi-percentage">@Model.Statistics.WarningPercentage.ToString("F1")%</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value info">@Model.Statistics.InfoCount</div>
+            <div class="kpi-label">Información</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value">@Model.Statistics.TotalLogs</div>
+            <div class="kpi-label">Total de Logs</div>
+        </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="charts-row">
+        <!-- Timeline -->
+        <div class="chart-box">
+            <h5><i class="fa fa-line-chart"></i> Timeline de Logs</h5>
+            <div id="timeline-chart" style="height: 350px;"></div>
+        </div>
+    </div>
+
+    <div class="charts-row">
+        <!-- Distribución por nivel -->
+        <div class="chart-box half-width">
+            <h5><i class="fa fa-pie-chart"></i> Distribución por Nivel</h5>
+            <div id="level-distribution-chart" style="height: 300px;"></div>
+        </div>
+
+        <!-- Top Errores -->
+        <div class="chart-box half-width">
+            <h5><i class="fa fa-list-ul"></i> Top 10 Errores</h5>
+            <div class="top-errors-list">
+                @foreach (var error in Model.TopErrors.Take(10))
+                {
+                    <div class="error-item">
+                        <div class="error-message">@error.Message</div>
+                        <div class="error-count">
+                            <span class="badge bg-danger">@error.Count</span>
+                            <span class="error-source">@error.Source</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Recientes -->
+    <div class="recent-section">
+        <h5><i class="fa fa-clock-o"></i> Logs Recientes</h5>
+        <div class="recent-logs">
+            @foreach (var log in Model.RecentLogs.Take(15))
+            {
+                <div class="log-card">
+                    <div class="log-header">
+                        <span class="log-level @log.Level.ToLower()">@log.Level</span>
+                        <span class="log-timestamp">@log.Timestamp:HH:mm:ss</span>
+                        <span class="log-source">@log.Source</span>
+                    </div>
+                    <div class="log-message">@log.Message</div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/dashboard.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+        Dashboard.init({
+        timeRange: '24h'
+        });
+        });
+    </script>
+}

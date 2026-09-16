@@ -1,0 +1,178 @@
+﻿@{
+    ViewData["Title"] = ViewData["Title"] ?? "Logger Portal - Logs Visualization";
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <base href="~/" />
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="/css/font-awesome.min.css">
+
+    <!-- ApexCharts CSS -->
+    <link rel="stylesheet" href="~/lib/apexcharts/apexcharts.css" />
+
+    <!-- Kibana Theme CSS -->
+    <link href="~/css/kibana-theme.css" rel="stylesheet" />
+</head>
+<body>
+    <div class="kibana-container">
+        <!-- Navbar Superior -->
+        <nav class="kibana-navbar">
+            <div class="navbar-brand">
+                <i class="fa fa-cube"></i>
+                <img src="~/images/bpnlogo-white.png" alt="Logo" style="height: 40px; width: auto; margin-right: 12px;">
+                <span>Logger Portal</span>
+            </div>
+
+            <div class="navbar-search">
+                <i class="fa fa-search"></i>
+                <input type="text" class="search-input" id="global-search"
+                       placeholder="🔍 Search logs..." />
+            </div>
+
+            <div class="navbar-menu">
+                <a href="/" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Home" && ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "")">
+                    <i class="fa fa-th-large"></i> Discover
+                </a>
+                <a href="/logs" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
+                    <i class="fa fa-list"></i> Logs
+                </a>
+                <a href="/dashboard" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Dashboard" ? "active" : "")">
+                    <i class="fa fa-bar-chart"></i> Dashboard
+                </a>
+                <a href="/search" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Search" ? "active" : "")">
+                    <i class="fa fa-search"></i> Search
+                </a>
+            </div>
+
+            <div class="navbar-actions">
+                <button class="btn-icon" title="Notifications" id="btn-notifications">
+                    <i class="fa fa-bell-o"></i>
+                </button>
+                <button class="btn-icon" title="Settings" id="btn-settings">
+                    <i class="fa fa-sliders"></i>
+                </button>
+                <button class="btn-icon" title="User Menu" id="btn-user">
+                    <i class="fa fa-user-circle"></i>
+                </button>
+            </div>
+        </nav>
+
+        <div class="kibana-main">
+            <!-- Sidebar -->
+            <aside class="kibana-sidebar" id="kibana-sidebar">
+                <div class="sidebar-section">
+                    <h6>FILTROS</h6>
+                    <div class="filter-group">
+                        <label class="filter-label">Rango de Tiempo</label>
+                        <select class="form-control form-control-sm" id="filter-timerange">
+                            <option value="15m">Últimos 15 minutos</option>
+                            <option value="1h">Última hora</option>
+                            <option value="24h" selected>Últimas 24 horas</option>
+                            <option value="7d">Últimos 7 días</option>
+                            <option value="30d">Últimos 30 días</option>
+                            <option value="custom">Rango personalizado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h6>NIVELES DE LOG</h6>
+                    <div class="quick-filters">
+                        <div class="quick-filter">
+                            <input type="checkbox" id="filter-error" class="log-level-filter" data-level="ERROR" checked />
+                            <label for="filter-error" class="filter-badge error">
+                                <i class="fa fa-times-circle"></i> ERROR
+                            </label>
+                        </div>
+                        <div class="quick-filter">
+                            <input type="checkbox" id="filter-warning" class="log-level-filter" data-level="WARNING" checked />
+                            <label for="filter-warning" class="filter-badge warning">
+                                <i class="fa fa-exclamation-triangle"></i> WARNING
+                            </label>
+                        </div>
+                        <div class="quick-filter">
+                            <input type="checkbox" id="filter-info" class="log-level-filter" data-level="INFO" checked />
+                            <label for="filter-info" class="filter-badge info">
+                                <i class="fa fa-info-circle"></i> INFO
+                            </label>
+                        </div>
+                        <div class="quick-filter">
+                            <input type="checkbox" id="filter-debug" class="log-level-filter" data-level="DEBUG" />
+                            <label for="filter-debug" class="filter-badge debug">
+                                <i class="fa fa-bug"></i> DEBUG
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h6>BÚSQUEDAS GUARDADAS</h6>
+                    <div class="saved-searches">
+                        <a href="#" class="saved-search-link">
+                            <i class="fa fa-star-o"></i> Errores recientes
+                        </a>
+                        <a href="#" class="saved-search-link">
+                            <i class="fa fa-star-o"></i> Performance issues
+                        </a>
+                        <a href="#" class="saved-search-link">
+                            <i class="fa fa-star-o"></i> Exceptions
+                        </a>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Contenido Principal -->
+            <main class="kibana-content">
+                <div class="content-wrapper">
+                    @RenderBody()
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación -->
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content kibana-modal">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmTitle">Confirmación</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="confirmMessage">
+                    ¿Estás seguro?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fa fa-times"></i> No
+                    </button>
+                    <button type="button" class="btn btn-primary" id="confirmBtn">
+                        <i class="fa fa-check"></i> Sí
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error UI -->
+    <div id="blazor-error-ui" style="display:none;">
+        An error has occurred. This application may no longer respond until reloaded.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <!-- Scripts -->
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/apexcharts/apexcharts.min.js"></script>
+    <script src="~/js/kibana-app.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

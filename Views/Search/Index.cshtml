@@ -1,0 +1,129 @@
+﻿@model SearchViewModel
+@{
+    ViewData["Title"] = "Búsqueda - Area 52";
+}
+
+<div class="search-container">
+    <div class="search-header">
+        <h1><i class="fa fa-search"></i> Búsqueda Avanzada</h1>
+        <p class="text-muted">Utiliza operadores avanzados para búsquedas precisas</p>
+    </div>
+
+    <!-- Barra de búsqueda -->
+    <form id="search-form" method="get" class="search-form">
+        <div class="input-group search-input-group">
+            <input type="text" class="form-control" id="search-query" name="q"
+                   value="@Model.Query" placeholder="Ingresa tu consulta..." />
+            <button class="btn btn-primary" type="submit">
+                <i class="fa fa-search"></i> Buscar
+            </button>
+        </div>
+    </form>
+
+    <!-- Ayuda de sintaxis -->
+    <div class="search-syntax-help">
+        <details>
+            <summary><i class="fa fa-question-circle"></i> Ayuda de sintaxis</summary>
+            <div class="syntax-content">
+                <table class="table table-sm table-dark">
+                    <tbody>
+                        <tr>
+                            <td><code>level:ERROR</code></td>
+                            <td>Buscar logs con nivel ERROR</td>
+                        </tr>
+                        <tr>
+                            <td><code>source:MyApp</code></td>
+                            <td>Buscar logs de una aplicación específica</td>
+                        </tr>
+                        <tr>
+                            <td><code>"mensaje exacto"</code></td>
+                            <td>Búsqueda de frase exacta</td>
+                        </tr>
+                        <tr>
+                            <td><code>level:ERROR AND source:API</code></td>
+                            <td>Combinar múltiples filtros</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    </div>
+
+    <!-- Resultados -->
+    @if (Model.HasError)
+    {
+        <div class="alert alert-danger">
+            <i class="fa fa-exclamation-circle"></i> Error en la búsqueda: @Model.ErrorMessage
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(Model.Query))
+    {
+        <div class="search-results">
+            <div class="results-info">
+                <span class="results-count">
+                    Encontrados <strong>@Model.ResultCount</strong> resultados
+                    en <strong>@Model.ExecutionTimeMs.ToString("F2")ms</strong>
+                </span>
+            </div>
+
+            @if (Model.Results.Any())
+            {
+                <div class="results-list">
+                    @foreach (var log in Model.Results)
+                    {
+                        <div class="log-card result-card">
+                            <div class="log-header">
+                                <span class="log-level @log.Level.ToLower()">@log.Level</span>
+                                <span class="log-timestamp">@log.Timestamp:yyyy-MM-dd HH:mm:ss.fff</span>
+                                <span class="log-source">@log.Source</span>
+                            </div>
+                            <div class="log-message">@log.Message</div>
+                            @if (log.Properties?.Any() ?? false)
+                            {
+                                <div class="log-properties">
+                                    @foreach (var prop in log.Properties.Take(3))
+                                    {
+                                        <span class="property-badge">
+                                            <strong>@prop.Key:</strong> @prop.Value
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="empty-state">
+                    <i class="fa fa-inbox"></i>
+                    <h4>No se encontraron resultados</h4>
+                    <p>Intenta con otro término de búsqueda</p>
+                </div>
+            }
+        </div>
+    }
+    else if (Model.Suggestions.Any())
+    {
+        <div class="search-suggestions">
+            <h5>Búsquedas sugeridas:</h5>
+            <div class="suggestions-list">
+                @foreach (var suggestion in Model.Suggestions)
+                {
+                    <a href="?q=@Uri.EscapeDataString(suggestion)" class="suggestion-chip">
+                        <i class="fa fa-arrow-right"></i> @suggestion
+                    </a>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script src="~/js/search.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+        SearchPage.init();
+        });
+    </script>
+}

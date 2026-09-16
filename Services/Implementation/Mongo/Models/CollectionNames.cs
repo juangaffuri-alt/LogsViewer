@@ -1,0 +1,19 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace LogsViewer.Services.Implementation.Mongo.Models;
+
+public static class CollectionNames
+{
+    public const string LockAcquires = "LockAcquires";
+    public const string LogEntities = "LogEntities";
+    public const string DataProtectionKeys = "DataProtectionKey";
+    public const string MongoTimeSeriesDefinition = "TimeSeriesDefinition";
+    public const string MongoTimeSeriesItems = "TimeSeriesItems";
+    public const string MongoUserPrefernce = "UserPrefernce";
+    public const string MongoApiKeySettingsModel = "ApiKeySettingsModel";
+    public const string MongoApiKeyModel = "ApiKeyModel";
+}

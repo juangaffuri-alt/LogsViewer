@@ -1,0 +1,96 @@
+﻿@model DashboardViewModel
+@{
+    ViewData["Title"] = "Discover - Area 52";
+}
+
+<div class="discover-container">
+    <div class="discover-header">
+        <h1><i class="fa fa-binoculars"></i> Discover</h1>
+        <p class="text-muted">Explora y analiza tus logs en tiempo real</p>
+    </div>
+
+    <!-- Estadísticas principales -->
+    <div class="discover-stats">
+        <div class="stat-card">
+            <div class="stat-icon error">
+                <i class="fa fa-exclamation-circle"></i>
+            </div>
+            <div class="stat-content">
+                <h6>Errores</h6>
+                <p class="stat-value" id="stat-errors">@Model.Statistics.ErrorCount</p>
+                <small class="stat-percentage">@Model.Statistics.ErrorPercentage.ToString("F1")%</small>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon warning">
+                <i class="fa fa-warning"></i>
+            </div>
+            <div class="stat-content">
+                <h6>Advertencias</h6>
+                <p class="stat-value" id="stat-warnings">@Model.Statistics.WarningCount</p>
+                <small class="stat-percentage">@Model.Statistics.WarningPercentage.ToString("F1")%</small>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <i class="fa fa-info-circle"></i>
+            </div>
+            <div class="stat-content">
+                <h6>Información</h6>
+                <p class="stat-value" id="stat-infos">@Model.Statistics.InfoCount</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fa fa-server"></i>
+            </div>
+            <div class="stat-content">
+                <h6>Total de Logs</h6>
+                <p class="stat-value" id="stat-total">@Model.Statistics.TotalLogs</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline Chart -->
+    <div class="chart-section">
+        <h5><i class="fa fa-line-chart"></i> Timeline de Logs</h5>
+        <div id="timeline-chart" style="height: 300px;" class="chart-container"></div>
+    </div>
+
+    <!-- Logs Recientes -->
+    <div class="recent-logs-section">
+        <div class="section-header">
+            <h5><i class="fa fa-clock-o"></i> Logs Recientes</h5>
+            <a href="/logs" class="btn btn-sm btn-outline-primary">
+                <i class="fa fa-arrow-right"></i> Ver todos
+            </a>
+        </div>
+        <div id="logs-list-container">
+            @foreach (var log in Model.RecentLogs)
+            {
+                <div class="log-card">
+                    <div class="log-header">
+                        <span class="log-level @log.Level.ToLower()">
+                            @log.Level
+                        </span>
+                        <span class="log-timestamp">@log.Timestamp:yyyy-MM-dd HH:mm:ss.fff</span>
+                        <span class="log-source">@log.Source</span>
+                    </div>
+                    <div class="log-message">@log.Message</div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/dashboard.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+        Dashboard.initDiscoverPage();
+        });
+    </script>
+}

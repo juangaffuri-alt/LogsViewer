@@ -1,0 +1,175 @@
+:root {
+    --sidebar-width: 240px;
+    --header-height: 56px;
+    --bg-dark: #1e1e24;
+    --bg-sidebar: #151519;
+    --bg-content: #1e1e24;
+    --text-light: #e6e6e6;
+    --accent: #00bfa5;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-light);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.app-wrapper {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* SIDEBAR */
+.app-sidebar {
+    width: var(--sidebar-width);
+    background-color: var(--bg-sidebar);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: width 0.2s ease;
+    border-right: 1px solid #2c2c33;
+}
+
+.sidebar-brand {
+    padding: 1rem 1.5rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #fff;
+    border-bottom: 1px solid #2c2c33;
+}
+
+    .sidebar-brand i {
+        margin-right: 0.5rem;
+    }
+
+.sidebar-nav {
+    flex: 1;
+    padding: 1rem 0;
+    overflow-y: auto;
+}
+
+    .sidebar-nav .nav-link {
+        color: #a0a0b0;
+        padding: 0.6rem 1.5rem;
+        border-radius: 0;
+        transition: background 0.15s, color 0.15s;
+    }
+
+        .sidebar-nav .nav-link i {
+            width: 1.5rem;
+            text-align: center;
+            margin-right: 0.8rem;
+        }
+
+        .sidebar-nav .nav-link:hover {
+            background: #2a2a30;
+            color: #fff;
+        }
+
+        .sidebar-nav .nav-link.active {
+            background: #2a2a30;
+            color: var(--accent);
+            border-right: 3px solid var(--accent);
+        }
+
+/* MAIN */
+.app-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-content);
+    min-width: 0;
+}
+
+/* HEADER */
+.app-header {
+    height: var(--header-height);
+    background-color: var(--bg-sidebar);
+    border-bottom: 1px solid #2c2c33;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+    flex-shrink: 0;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-title {
+    font-weight: 500;
+    color: #fff;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.search-box {
+    display: flex;
+    align-items: center;
+    background: #2c2c33;
+    border-radius: 20px;
+    padding: 0.2rem 0.8rem;
+    color: #a0a0b0;
+}
+
+    .search-box input {
+        background: transparent;
+        border: none;
+        color: #fff;
+        outline: none;
+        padding: 0.3rem 0.5rem;
+        width: 180px;
+    }
+
+        .search-box input::placeholder {
+            color: #7a7a8a;
+        }
+
+.user-menu {
+    display: flex;
+    gap: 1rem;
+    font-size: 1.2rem;
+    color: #a0a0b0;
+    cursor: pointer;
+}
+
+    .user-menu i:hover {
+        color: #fff;
+    }
+
+/* CONTENT */
+.app-content {
+    flex: 1;
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+/* RESPONSIVE: colapsar sidebar en móviles */
+@media (max-width: 768px) {
+    .app-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100%;
+        z-index: 1050;
+        transform: translateX(-100%);
+        transition: transform 0.2s ease;
+    }
+
+    .app-wrapper.sidebar-collapsed .app-sidebar {
+        transform: translateX(0);
+    }
+
+    .app-main {
+        margin-left: 0;
+    }
+}
