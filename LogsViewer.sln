@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.6.11806.211 stable
+VisualStudioVersion = 18.6.11806.211
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogsViewer", "LogsViewer.csproj", "{C920E26D-D558-B74C-8595-2CDEF3BD3825}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClienteLogs", "..\ClienteLogs\ClienteLogs.csproj", "{5749E78C-38A2-4B87-BC50-3F0C0AC286C9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{C920E26D-D558-B74C-8595-2CDEF3BD3825}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C920E26D-D558-B74C-8595-2CDEF3BD3825}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C920E26D-D558-B74C-8595-2CDEF3BD3825}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5749E78C-38A2-4B87-BC50-3F0C0AC286C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5749E78C-38A2-4B87-BC50-3F0C0AC286C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5749E78C-38A2-4B87-BC50-3F0C0AC286C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5749E78C-38A2-4B87-BC50-3F0C0AC286C9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,6 +1,6 @@
 ﻿@model DashboardViewModel
 @{
-    ViewData["Title"] = "Discover - Area 52";
+    ViewData["Title"] = "Discover - Logger Viewer";
 }
 
 <div class="discover-container">
@@ -69,17 +69,28 @@
             </a>
         </div>
         <div id="logs-list-container">
-            @foreach (var log in Model.RecentLogs)
+            @if (Model.RecentLogs.Any())
             {
-                <div class="log-card">
-                    <div class="log-header">
-                        <span class="log-level @log.Level.ToLower()">
-                            @log.Level
-                        </span>
-                        <span class="log-timestamp">@log.Timestamp:yyyy-MM-dd HH:mm:ss.fff</span>
-                        <span class="log-source">@log.Source</span>
+                @foreach (var log in Model.RecentLogs)
+                {
+                    <div class="log-card">
+                        <div class="log-header">
+                            <span class="log-level @log.Level.ToLower()">
+                                @log.Level
+                            </span>
+                            <span class="log-timestamp">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</span>
+                            <span class="log-source">@log.Source</span>
+                        </div>
+                        <div class="log-message">@log.Message</div>
                     </div>
-                    <div class="log-message">@log.Message</div>
+                }
+            }
+            else
+            {
+                <div class="empty-state">
+                    <i class="fa fa-inbox"></i>
+                    <h4>Todavía no llegaron logs</h4>
+                    <p>Envía eventos al endpoint <code>/api/events/raw</code> para verlos acá.</p>
                 </div>
             }
         </div>
@@ -87,10 +98,14 @@
 </div>
 
 @section Scripts {
-    <script src="~/js/dashboard.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-        Dashboard.initDiscoverPage();
-        });
+        window.timelineData = {
+            timestamps: [@Html.Raw(string.Join(",", Model.TimeSeriesData.Timestamps.Select(t => $"\"{t}\"")))],
+            error: [@string.Join(",", Model.TimeSeriesData.ErrorCounts)],
+            warning: [@string.Join(",", Model.TimeSeriesData.WarningCounts)],
+            info: [@string.Join(",", Model.TimeSeriesData.InfoCounts)],
+            debug: [@string.Join(",", Model.TimeSeriesData.DebugCounts)]
+        };
     </script>
+    <script src="~/js/charts.js"></script>
 }

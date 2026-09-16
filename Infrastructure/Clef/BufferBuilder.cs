@@ -60,7 +60,7 @@ internal struct BufferBuilder : IDisposable
     {
         if (this.buffer.Length < this.length + appendSize)
         {
-            byte[] newBuffer = ArrayPool<byte>.Shared.Rent(this.length + appendSize + 256); // TODO pozriet ako je to v area 52
+            byte[] newBuffer = ArrayPool<byte>.Shared.Rent(this.length + appendSize + 256); // TODO pozriet ako je to v Logger Viewer
             this.buffer.AsSpan(0, this.length).CopyTo(newBuffer);
             ArrayPool<byte>.Shared.Return(this.buffer, false);
             this.buffer = newBuffer;

@@ -1,18 +1,25 @@
 ﻿using LogsViewer.Models;
 using LogsViewer.Services.Contracts;
+using Microsoft.Extensions.Logging;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Linq;
-using System.Diagnostics;
+using Raven.Client.Documents.Session;
 
 namespace LogsViewer.Services.Implementation;
 
 /// <summary>
-/// Implementación de ILogService usando RavenDB
+/// Implementación de ILogService usando RavenDB.
+/// Lee de la colección LogEntity, que es donde EventMiddleware/LogWriter
+/// realmente persisten los eventos que llegan por /api/events/raw.
 /// </summary>
 public class LogService : ILogService
 {
     private readonly IDocumentStore _documentStore;
     private readonly ILogger<LogService> _logger;
+
+    // Ventana de trabajo para operaciones que agregan/agrupan en memoria
+    // (RavenDB no puede agrupar cómodamente por campos derivados como "Source").
+    private const int WorkingSetSize = 10000;
 
     public LogService(IDocumentStore documentStore, ILogger<LogService> logger)
     {
@@ -24,16 +31,14 @@ public class LogService : ILogService
     {
         try
         {
-            using (var session = _documentStore.OpenAsyncSession())
-            {
-                var logs = await session.Query<LogViewModel>()
-                    .OrderByDescending(x => x.Timestamp)
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .ToListAsync();
+            using var session = _documentStore.OpenAsyncSession();
+            var entities = await session.Query<LogEntity>()
+                .OrderByDescending(x => x.Timestamp)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
 
-                return logs;
-            }
+            return entities.Select(e => MapToViewModel(e, session)).ToList();
         }
         catch (Exception ex)
         {
@@ -46,13 +51,8 @@ public class LogService : ILogService
     {
         try
         {
-            using (var session = _documentStore.OpenAsyncSession())
-            {
-                var count = await session.Query<LogViewModel>()
-                    .CountAsync();
-
-                return count;
-            }
+            using var session = _documentStore.OpenAsyncSession();
+            return await session.Query<LogEntity>().CountAsync();
         }
         catch (Exception ex)
         {
@@ -65,15 +65,13 @@ public class LogService : ILogService
     {
         try
         {
-            using (var session = _documentStore.OpenAsyncSession())
-            {
-                var logs = await session.Query<LogViewModel>()
-                    .OrderByDescending(x => x.Timestamp)
-                    .Take(count)
-                    .ToListAsync();
+            using var session = _documentStore.OpenAsyncSession();
+            var entities = await session.Query<LogEntity>()
+                .OrderByDescending(x => x.Timestamp)
+                .Take(count)
+                .ToListAsync();
 
-                return logs;
-            }
+            return entities.Select(e => MapToViewModel(e, session)).ToList();
         }
         catch (Exception ex)
         {
@@ -89,19 +87,16 @@ public class LogService : ILogService
             if (string.IsNullOrWhiteSpace(query))
                 return new List<LogViewModel>();
 
-            using (var session = _documentStore.OpenAsyncSession())
-            {
-                var logs = await session.Query<LogViewModel>()
-                    .Where(x =>
-                        x.Message.Contains(query) ||
-                        x.Source.Contains(query) ||
-                        (x.Exception != null && x.Exception.Contains(query)))
-                    .OrderByDescending(x => x.Timestamp)
-                    .Take(1000)
-                    .ToListAsync();
+            using var session = _documentStore.OpenAsyncSession();
+            var entities = await session.Query<LogEntity>()
+                .Where(x =>
+                    x.Message.Contains(query) ||
+                    (x.Exception != null && x.Exception.Contains(query)))
+                .OrderByDescending(x => x.Timestamp)
+                .Take(1000)
+                .ToListAsync();
 
-                return logs;
-            }
+            return entities.Select(e => MapToViewModel(e, session)).ToList();
         }
         catch (Exception ex)
         {
@@ -114,33 +109,33 @@ public class LogService : ILogService
     {
         try
         {
-            using (var session = _documentStore.OpenAsyncSession())
+            using var session = _documentStore.OpenAsyncSession();
+            var entities = await session.Query<LogEntity>()
+                .OrderByDescending(x => x.Timestamp)
+                .Take(WorkingSetSize)
+                .ToListAsync();
+
+            var logs = entities.Select(e => MapToViewModel(e, session)).ToList();
+
+            var stats = new LogStatisticsViewModel
             {
-                var logs = await session.Query<LogViewModel>()
-                    .OrderByDescending(x => x.Timestamp)
-                    .Take(10000)
-                    .ToListAsync();
+                TotalLogs = logs.Count,
+                ErrorCount = logs.Count(x => x.Level == "ERROR"),
+                WarningCount = logs.Count(x => x.Level == "WARNING"),
+                InfoCount = logs.Count(x => x.Level == "INFO"),
+                DebugCount = logs.Count(x => x.Level == "DEBUG"),
+                TraceCount = logs.Count(x => x.Level == "TRACE"),
+                LogsBySource = logs
+                    .GroupBy(x => x.Source)
+                    .ToDictionary(g => g.Key, g => g.Count()),
+                LogsByHour = logs
+                    .GroupBy(x => x.Timestamp.ToString("yyyy-MM-dd HH:00"))
+                    .OrderByDescending(g => g.Key)
+                    .Take(24)
+                    .ToDictionary(g => g.Key, g => g.Count())
+            };
 
-                var stats = new LogStatisticsViewModel
-                {
-                    TotalLogs = logs.Count,
-                    ErrorCount = logs.Count(x => x.Level == "ERROR"),
-                    WarningCount = logs.Count(x => x.Level == "WARNING"),
-                    InfoCount = logs.Count(x => x.Level == "INFO"),
-                    DebugCount = logs.Count(x => x.Level == "DEBUG"),
-                    TraceCount = logs.Count(x => x.Level == "TRACE"),
-                    LogsBySource = logs
-                        .GroupBy(x => x.Source)
-                        .ToDictionary(g => g.Key, g => g.Count()),
-                    LogsByHour = logs
-                        .GroupBy(x => x.Timestamp.ToString("yyyy-MM-dd HH:00"))
-                        .OrderByDescending(g => g.Key)
-                        .Take(24)
-                        .ToDictionary(g => g.Key, g => g.Count())
-                };
-
-                return stats;
-            }
+            return stats;
         }
         catch (Exception ex)
         {
@@ -155,29 +150,27 @@ public class LogService : ILogService
         {
             var startDate = GetStartDateFromTimeRange(timeRange);
 
-            using (var session = _documentStore.OpenAsyncSession())
+            using var session = _documentStore.OpenAsyncSession();
+            var entities = await session.Query<LogEntity>()
+                .Where(x => x.Timestamp >= startDate)
+                .OrderBy(x => x.Timestamp)
+                .ToListAsync();
+
+            var logs = entities.Select(e => MapToViewModel(e, session)).ToList();
+
+            var groupedData = logs
+                .GroupBy(x => x.Timestamp.ToString("yyyy-MM-dd HH:00"))
+                .OrderBy(g => g.Key)
+                .ToList();
+
+            return new TimeSeriesDataViewModel
             {
-                var logs = await session.Query<LogViewModel>()
-                    .Where(x => x.Timestamp >= startDate)
-                    .OrderBy(x => x.Timestamp)
-                    .ToListAsync();
-
-                var groupedData = logs
-                    .GroupBy(x => x.Timestamp.ToString("yyyy-MM-dd HH:00"))
-                    .OrderBy(g => g.Key)
-                    .ToList();
-
-                var model = new TimeSeriesDataViewModel
-                {
-                    Timestamps = groupedData.Select(g => g.Key).ToList(),
-                    ErrorCounts = groupedData.Select(g => g.Count(x => x.Level == "ERROR")).ToList(),
-                    WarningCounts = groupedData.Select(g => g.Count(x => x.Level == "WARNING")).ToList(),
-                    InfoCounts = groupedData.Select(g => g.Count(x => x.Level == "INFO")).ToList(),
-                    DebugCounts = groupedData.Select(g => g.Count(x => x.Level == "DEBUG")).ToList()
-                };
-
-                return model;
-            }
+                Timestamps = groupedData.Select(g => g.Key).ToList(),
+                ErrorCounts = groupedData.Select(g => g.Count(x => x.Level == "ERROR")).ToList(),
+                WarningCounts = groupedData.Select(g => g.Count(x => x.Level == "WARNING")).ToList(),
+                InfoCounts = groupedData.Select(g => g.Count(x => x.Level == "INFO")).ToList(),
+                DebugCounts = groupedData.Select(g => g.Count(x => x.Level == "DEBUG")).ToList()
+            };
         }
         catch (Exception ex)
         {
@@ -190,28 +183,26 @@ public class LogService : ILogService
     {
         try
         {
-            using (var session = _documentStore.OpenAsyncSession())
-            {
-                var errors = await session.Query<LogViewModel>()
-                    .Where(x => x.Level == "ERROR")
-                    .OrderByDescending(x => x.Timestamp)
-                    .Take(1000)
-                    .ToListAsync();
+            using var session = _documentStore.OpenAsyncSession();
+            var entities = await session.Query<LogEntity>()
+                .Where(x => x.LevelNumeric == (int)LogLevel.Error || x.LevelNumeric == (int)LogLevel.Critical)
+                .OrderByDescending(x => x.Timestamp)
+                .Take(1000)
+                .ToListAsync();
 
-                var topErrors = errors
-                    .GroupBy(x => x.Message)
-                    .OrderByDescending(g => g.Count())
-                    .Take(limit)
-                    .Select(g => new TopErrorViewModel
-                    {
-                        Message = g.Key,
-                        Count = g.Count(),
-                        Source = g.FirstOrDefault()?.Source ?? "Unknown"
-                    })
-                    .ToList();
+            var errors = entities.Select(e => MapToViewModel(e, session)).ToList();
 
-                return topErrors;
-            }
+            return errors
+                .GroupBy(x => x.Message)
+                .OrderByDescending(g => g.Count())
+                .Take(limit)
+                .Select(g => new TopErrorViewModel
+                {
+                    Message = g.Key,
+                    Count = g.Count(),
+                    Source = g.FirstOrDefault()?.Source ?? "Unknown"
+                })
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -224,16 +215,17 @@ public class LogService : ILogService
     {
         try
         {
-            using (var session = _documentStore.OpenAsyncSession())
-            {
-                var logs = await session.Query<LogViewModel>()
-                    .Where(x => x.Level == level)
-                    .OrderByDescending(x => x.Timestamp)
-                    .Take(limit)
-                    .ToListAsync();
+            using var session = _documentStore.OpenAsyncSession();
+            var entities = await session.Query<LogEntity>()
+                .OrderByDescending(x => x.Timestamp)
+                .Take(WorkingSetSize)
+                .ToListAsync();
 
-                return logs;
-            }
+            return entities
+                .Select(e => MapToViewModel(e, session))
+                .Where(x => string.Equals(x.Level, level, StringComparison.OrdinalIgnoreCase))
+                .Take(limit)
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -246,16 +238,17 @@ public class LogService : ILogService
     {
         try
         {
-            using (var session = _documentStore.OpenAsyncSession())
-            {
-                var logs = await session.Query<LogViewModel>()
-                    .Where(x => x.Source == source)
-                    .OrderByDescending(x => x.Timestamp)
-                    .Take(limit)
-                    .ToListAsync();
+            using var session = _documentStore.OpenAsyncSession();
+            var entities = await session.Query<LogEntity>()
+                .OrderByDescending(x => x.Timestamp)
+                .Take(WorkingSetSize)
+                .ToListAsync();
 
-                return logs;
-            }
+            return entities
+                .Select(e => MapToViewModel(e, session))
+                .Where(x => string.Equals(x.Source, source, StringComparison.OrdinalIgnoreCase))
+                .Take(limit)
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -268,50 +261,13 @@ public class LogService : ILogService
     {
         try
         {
-            using (var session = _documentStore.OpenAsyncSession())
-            {
-                // Iniciar la consulta con IRavenQueryable
-                IRavenQueryable<LogViewModel> query = session.Query<LogViewModel>();
+            var logs = await GetFilteredLogsAsync(criteria);
 
-                // Filtro de texto
-                if (!string.IsNullOrWhiteSpace(criteria.Query))
-                {
-                    query = query.Where(x =>
-                        x.Message.Contains(criteria.Query) ||
-                        x.Source.Contains(criteria.Query));
-                }
-
-                // Filtro por niveles
-                if (criteria.Levels.Any())
-                {
-                    query = query.Where(x => criteria.Levels.Contains(x.Level));
-                }
-
-                // Filtro por fuentes
-                if (criteria.Sources.Any())
-                {
-                    query = query.Where(x => criteria.Sources.Contains(x.Source));
-                }
-
-                // Filtro por rango de fechas
-                if (criteria.StartDate.HasValue)
-                {
-                    query = query.Where(x => x.Timestamp >= criteria.StartDate);
-                }
-
-                if (criteria.EndDate.HasValue)
-                {
-                    query = query.Where(x => x.Timestamp <= criteria.EndDate);
-                }
-
-                var logs = await query
-                    .OrderByDescending(x => x.Timestamp)
-                    .Skip((criteria.Page - 1) * criteria.PageSize)
-                    .Take(criteria.PageSize)
-                    .ToListAsync();
-
-                return logs;
-            }
+            return logs
+                .OrderByDescending(x => x.Timestamp)
+                .Skip((criteria.Page - 1) * criteria.PageSize)
+                .Take(criteria.PageSize)
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -319,6 +275,45 @@ public class LogService : ILogService
             return new List<LogViewModel>();
         }
     }
+
+    /// <summary>
+    /// Convierte una LogEntity (lo que realmente guarda LogWriter) al LogViewModel
+    /// que consumen las vistas.
+    /// </summary>
+    private static LogViewModel MapToViewModel(LogEntity entity, IAsyncDocumentSession session)
+    {
+        string source = entity.Properties
+            .Where(p => p.Name is "Application" or "SourceContext" or "MachineName")
+            .Select(p => p.GetValueString())
+            .FirstOrDefault(v => !string.IsNullOrEmpty(v)) ?? "Unknown";
+
+        return new LogViewModel
+        {
+            Id = session.Advanced.GetDocumentId(entity) ?? string.Empty,
+            Timestamp = entity.Timestamp.UtcDateTime,
+            Level = MapLevelBucket(entity.LevelNumeric),
+            Message = entity.Message,
+            Source = source,
+            Exception = entity.Exception,
+            StackTrace = entity.Exception,
+            Properties = entity.Properties.ToDictionary(p => p.Name, p => (object)p.GetValueString())
+        };
+    }
+
+    /// <summary>
+    /// Mapea el LogLevel numérico (seteado por ClefParser) a los buckets
+    /// ERROR/WARNING/INFO/DEBUG/TRACE que usan las estadísticas y filtros.
+    /// </summary>
+    private static string MapLevelBucket(int levelNumeric) => (LogLevel)levelNumeric switch
+    {
+        LogLevel.Trace => "TRACE",
+        LogLevel.Debug => "DEBUG",
+        LogLevel.Information => "INFO",
+        LogLevel.Warning => "WARNING",
+        LogLevel.Error => "ERROR",
+        LogLevel.Critical => "ERROR",
+        _ => "INFO"
+    };
 
     /// <summary>
     /// Convierte rango de tiempo a fecha de inicio
@@ -334,5 +329,57 @@ public class LogService : ILogService
             "30d" => DateTime.UtcNow.AddDays(-30),
             _ => DateTime.UtcNow.AddHours(-24)
         };
+    }
+    public async Task<int> AdvancedSearchCountAsync(AdvancedSearchCriteria criteria)
+    {
+        try
+        {
+            var logs = await GetFilteredLogsAsync(criteria);
+            return logs.Count;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error counting advanced search results");
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Aplica todos los filtros de AdvancedSearchCriteria (menos paginado) y devuelve
+    /// la lista completa resultante. Compartido entre AdvancedSearchAsync y AdvancedSearchCountAsync
+    /// para que la cuenta y los resultados paginados siempre sean consistentes entre sí.
+    /// </summary>
+    private async Task<List<LogViewModel>> GetFilteredLogsAsync(AdvancedSearchCriteria criteria)
+    {
+        using var session = _documentStore.OpenAsyncSession();
+        IRavenQueryable<LogEntity> query = session.Query<LogEntity>();
+
+        if (criteria.StartDate.HasValue)
+            query = query.Where(x => x.Timestamp >= criteria.StartDate);
+
+        if (criteria.EndDate.HasValue)
+            query = query.Where(x => x.Timestamp <= criteria.EndDate);
+
+        var entities = await query
+            .OrderByDescending(x => x.Timestamp)
+            .Take(WorkingSetSize)
+            .ToListAsync();
+
+        var logs = entities.Select(e => MapToViewModel(e, session)).AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(criteria.Query))
+        {
+            logs = logs.Where(x =>
+                x.Message.Contains(criteria.Query, StringComparison.OrdinalIgnoreCase) ||
+                x.Source.Contains(criteria.Query, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (criteria.Levels.Any())
+            logs = logs.Where(x => criteria.Levels.Contains(x.Level));
+
+        if (criteria.Sources.Any())
+            logs = logs.Where(x => criteria.Sources.Contains(x.Source));
+
+        return logs.ToList();
     }
 }

@@ -21,6 +21,9 @@
 
     <!-- Kibana Theme CSS -->
     <link href="~/css/kibana-theme.css" rel="stylesheet" />
+
+    <!-- Page content styling (stat cards, log cards, charts) -->
+    <link href="~/css/pages.css" rel="stylesheet" />
 </head>
 <body>
     <div class="kibana-container">
@@ -68,62 +71,79 @@
 
         <div class="kibana-main">
             <!-- Sidebar -->
+            @{
+                var qsLevels = Context.Request.Query["levels"];
+                var activeLevels = qsLevels.Count > 0
+                    ? qsLevels.ToArray()!
+                    : new[] { "ERROR", "WARNING", "INFO", "DEBUG" };
+                var activeTimeRange = Context.Request.Query["timeRange"].FirstOrDefault() ?? "24h";
+                var activeQuery = Context.Request.Query["query"].FirstOrDefault();
+            }
             <aside class="kibana-sidebar" id="kibana-sidebar">
-                <div class="sidebar-section">
-                    <h6>FILTROS</h6>
-                    <div class="filter-group">
-                        <label class="filter-label">Rango de Tiempo</label>
-                        <select class="form-control form-control-sm" id="filter-timerange">
-                            <option value="15m">Últimos 15 minutos</option>
-                            <option value="1h">Última hora</option>
-                            <option value="24h" selected>Últimas 24 horas</option>
-                            <option value="7d">Últimos 7 días</option>
-                            <option value="30d">Últimos 30 días</option>
-                            <option value="custom">Rango personalizado</option>
-                        </select>
+                <form id="sidebar-filters-form" method="get" action="/logs">
+                    @if (!string.IsNullOrEmpty(activeQuery))
+                    {
+                        <input type="hidden" name="query" value="@activeQuery" />
+                    }
+                    <div class="sidebar-section">
+                        <h6>FILTROS</h6>
+                        <div class="filter-group">
+                            <label class="filter-label">Rango de Tiempo</label>
+                            <select class="form-control form-control-sm" id="filter-timerange" name="timeRange" onchange="document.getElementById('sidebar-filters-form').submit()">
+                                <option value="15m" selected="@(activeTimeRange == "15m")">Últimos 15 minutos</option>
+                                <option value="1h" selected="@(activeTimeRange == "1h")">Última hora</option>
+                                <option value="24h" selected="@(activeTimeRange == "24h")">Últimas 24 horas</option>
+                                <option value="7d" selected="@(activeTimeRange == "7d")">Últimos 7 días</option>
+                                <option value="30d" selected="@(activeTimeRange == "30d")">Últimos 30 días</option>
+                            </select>
+                        </div>
                     </div>
-                </div>
 
-                <div class="sidebar-section">
-                    <h6>NIVELES DE LOG</h6>
-                    <div class="quick-filters">
-                        <div class="quick-filter">
-                            <input type="checkbox" id="filter-error" class="log-level-filter" data-level="ERROR" checked />
-                            <label for="filter-error" class="filter-badge error">
-                                <i class="fa fa-times-circle"></i> ERROR
-                            </label>
-                        </div>
-                        <div class="quick-filter">
-                            <input type="checkbox" id="filter-warning" class="log-level-filter" data-level="WARNING" checked />
-                            <label for="filter-warning" class="filter-badge warning">
-                                <i class="fa fa-exclamation-triangle"></i> WARNING
-                            </label>
-                        </div>
-                        <div class="quick-filter">
-                            <input type="checkbox" id="filter-info" class="log-level-filter" data-level="INFO" checked />
-                            <label for="filter-info" class="filter-badge info">
-                                <i class="fa fa-info-circle"></i> INFO
-                            </label>
-                        </div>
-                        <div class="quick-filter">
-                            <input type="checkbox" id="filter-debug" class="log-level-filter" data-level="DEBUG" />
-                            <label for="filter-debug" class="filter-badge debug">
-                                <i class="fa fa-bug"></i> DEBUG
-                            </label>
+                    <div class="sidebar-section">
+                        <h6>NIVELES DE LOG</h6>
+                        <div class="quick-filters">
+                            <div class="quick-filter">
+                                <input type="checkbox" id="filter-error" class="log-level-filter" name="levels" value="ERROR"
+                                       onchange="document.getElementById('sidebar-filters-form').submit()" checked="@activeLevels.Contains("ERROR")" />
+                                <label for="filter-error" class="filter-badge error">
+                                    <i class="fa fa-times-circle"></i> ERROR
+                                </label>
+                            </div>
+                            <div class="quick-filter">
+                                <input type="checkbox" id="filter-warning" class="log-level-filter" name="levels" value="WARNING"
+                                       onchange="document.getElementById('sidebar-filters-form').submit()" checked="@activeLevels.Contains("WARNING")" />
+                                <label for="filter-warning" class="filter-badge warning">
+                                    <i class="fa fa-exclamation-triangle"></i> WARNING
+                                </label>
+                            </div>
+                            <div class="quick-filter">
+                                <input type="checkbox" id="filter-info" class="log-level-filter" name="levels" value="INFO"
+                                       onchange="document.getElementById('sidebar-filters-form').submit()" checked="@activeLevels.Contains("INFO")" />
+                                <label for="filter-info" class="filter-badge info">
+                                    <i class="fa fa-info-circle"></i> INFO
+                                </label>
+                            </div>
+                            <div class="quick-filter">
+                                <input type="checkbox" id="filter-debug" class="log-level-filter" name="levels" value="DEBUG"
+                                       onchange="document.getElementById('sidebar-filters-form').submit()" checked="@activeLevels.Contains("DEBUG")" />
+                                <label for="filter-debug" class="filter-badge debug">
+                                    <i class="fa fa-bug"></i> DEBUG
+                                </label>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </form>
 
                 <div class="sidebar-section">
                     <h6>BÚSQUEDAS GUARDADAS</h6>
                     <div class="saved-searches">
-                        <a href="#" class="saved-search-link">
+                        <a href="/logs?levels=ERROR" class="saved-search-link">
                             <i class="fa fa-star-o"></i> Errores recientes
                         </a>
-                        <a href="#" class="saved-search-link">
+                        <a href="/logs?query=timeout" class="saved-search-link">
                             <i class="fa fa-star-o"></i> Performance issues
                         </a>
-                        <a href="#" class="saved-search-link">
+                        <a href="/logs?query=Exception" class="saved-search-link">
                             <i class="fa fa-star-o"></i> Exceptions
                         </a>
                     </div>

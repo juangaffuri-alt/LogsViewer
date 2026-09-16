@@ -16,6 +16,8 @@
     --kibana-warning: #f5a700;
     --kibana-success: #33a652;
     --kibana-info: #0078d4;
+    --kibana-debug: #646a73;
+    --kibana-trace: #999ca3;
 }
 
 * {
@@ -67,9 +69,9 @@ html, body {
     white-space: nowrap;
 }
 
-.navbar-brand i {
-    font-size: 1.5rem;
-}
+    .navbar-brand i {
+        font-size: 1.5rem;
+    }
 
 .navbar-search {
     flex: 1;
@@ -81,9 +83,9 @@ html, body {
     height: 36px;
 }
 
-.navbar-search i {
-    color: rgba(255, 255, 255, 0.6);
-}
+    .navbar-search i {
+        color: rgba(255, 255, 255, 0.6);
+    }
 
 .search-input {
     flex: 1;
@@ -95,9 +97,9 @@ html, body {
     font-size: 14px;
 }
 
-.search-input::placeholder {
-    color: rgba(255, 255, 255, 0.6);
-}
+    .search-input::placeholder {
+        color: rgba(255, 255, 255, 0.6);
+    }
 
 .navbar-menu {
     display: flex;
@@ -105,19 +107,19 @@ html, body {
     align-items: center;
 }
 
-.navbar-menu .nav-link {
-    color: rgba(255, 255, 255, 0.8);
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s ease;
-}
+    .navbar-menu .nav-link {
+        color: rgba(255, 255, 255, 0.8);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
 
-.navbar-menu .nav-link:hover,
-.navbar-menu .nav-link.active {
-    color: white;
-}
+        .navbar-menu .nav-link:hover,
+        .navbar-menu .nav-link.active {
+            color: white;
+        }
 
 .navbar-actions {
     display: flex;
@@ -135,9 +137,9 @@ html, body {
     transition: all 0.2s ease;
 }
 
-.btn-icon:hover {
-    color: white;
-}
+    .btn-icon:hover {
+        color: white;
+    }
 
 /* Main Layout */
 .kibana-main {
@@ -161,14 +163,14 @@ html, body {
     margin-bottom: 30px;
 }
 
-.sidebar-section h6 {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--kibana-neutral-600);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 12px;
-}
+    .sidebar-section h6 {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--kibana-neutral-600);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 12px;
+    }
 
 .filter-group {
     display: flex;
@@ -191,11 +193,11 @@ html, body {
     color: var(--kibana-neutral-700);
 }
 
-.form-control:focus {
-    outline: none;
-    border-color: var(--kibana-primary);
-    box-shadow: 0 0 0 2px rgba(31, 120, 209, 0.1);
-}
+    .form-control:focus {
+        outline: none;
+        border-color: var(--kibana-primary);
+        box-shadow: 0 0 0 2px rgba(31, 120, 209, 0.1);
+    }
 
 /* Quick Filters */
 .quick-filters {
@@ -210,11 +212,11 @@ html, body {
     gap: 8px;
 }
 
-.quick-filter input[type="checkbox"] {
-    cursor: pointer;
-    width: 16px;
-    height: 16px;
-}
+    .quick-filter input[type="checkbox"] {
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
+    }
 
 .filter-badge {
     display: flex;
@@ -228,41 +230,41 @@ html, body {
     transition: all 0.2s ease;
 }
 
-.filter-badge.error {
-    background-color: rgba(216, 44, 13, 0.1);
-    color: var(--kibana-error);
-}
+    .filter-badge.error {
+        background-color: rgba(216, 44, 13, 0.1);
+        color: var(--kibana-error);
+    }
 
-.filter-badge.error:hover {
-    background-color: rgba(216, 44, 13, 0.15);
-}
+        .filter-badge.error:hover {
+            background-color: rgba(216, 44, 13, 0.15);
+        }
 
-.filter-badge.warning {
-    background-color: rgba(245, 167, 0, 0.1);
-    color: var(--kibana-warning);
-}
+    .filter-badge.warning {
+        background-color: rgba(245, 167, 0, 0.1);
+        color: var(--kibana-warning);
+    }
 
-.filter-badge.warning:hover {
-    background-color: rgba(245, 167, 0, 0.15);
-}
+        .filter-badge.warning:hover {
+            background-color: rgba(245, 167, 0, 0.15);
+        }
 
-.filter-badge.info {
-    background-color: rgba(0, 120, 212, 0.1);
-    color: var(--kibana-info);
-}
+    .filter-badge.info {
+        background-color: rgba(0, 120, 212, 0.1);
+        color: var(--kibana-info);
+    }
 
-.filter-badge.info:hover {
-    background-color: rgba(0, 120, 212, 0.15);
-}
+        .filter-badge.info:hover {
+            background-color: rgba(0, 120, 212, 0.15);
+        }
 
-.filter-badge.debug {
-    background-color: rgba(100, 106, 115, 0.1);
-    color: var(--kibana-neutral-700);
-}
+    .filter-badge.debug {
+        background-color: rgba(100, 106, 115, 0.1);
+        color: var(--kibana-neutral-700);
+    }
 
-.filter-badge.debug:hover {
-    background-color: rgba(100, 106, 115, 0.15);
-}
+        .filter-badge.debug:hover {
+            background-color: rgba(100, 106, 115, 0.15);
+        }
 
 /* Saved Searches */
 .saved-searches {
@@ -283,9 +285,9 @@ html, body {
     gap: 8px;
 }
 
-.saved-search-link:hover {
-    background-color: rgba(31, 120, 209, 0.1);
-}
+    .saved-search-link:hover {
+        background-color: rgba(31, 120, 209, 0.1);
+    }
 
 /* Content Area */
 .kibana-content {
@@ -310,22 +312,22 @@ html, body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.kibana-modal .modal-header {
-    background-color: var(--kibana-neutral-100);
-    border-bottom: 1px solid var(--kibana-neutral-300);
-    padding: 15px 20px;
-}
+    .kibana-modal .modal-header {
+        background-color: var(--kibana-neutral-100);
+        border-bottom: 1px solid var(--kibana-neutral-300);
+        padding: 15px 20px;
+    }
 
-.kibana-modal .modal-body {
-    padding: 20px;
-    color: var(--kibana-neutral-700);
-}
+    .kibana-modal .modal-body {
+        padding: 20px;
+        color: var(--kibana-neutral-700);
+    }
 
-.kibana-modal .modal-footer {
-    background-color: var(--kibana-neutral-100);
-    border-top: 1px solid var(--kibana-neutral-300);
-    padding: 15px 20px;
-}
+    .kibana-modal .modal-footer {
+        background-color: var(--kibana-neutral-100);
+        border-top: 1px solid var(--kibana-neutral-300);
+        padding: 15px 20px;
+    }
 
 /* Buttons */
 .btn {
@@ -347,18 +349,18 @@ html, body {
     color: white;
 }
 
-.btn-primary:hover {
-    background-color: var(--kibana-secondary);
-}
+    .btn-primary:hover {
+        background-color: var(--kibana-secondary);
+    }
 
 .btn-secondary {
     background-color: var(--kibana-neutral-300);
     color: var(--kibana-neutral-700);
 }
 
-.btn-secondary:hover {
-    background-color: var(--kibana-neutral-400);
-}
+    .btn-secondary:hover {
+        background-color: var(--kibana-neutral-400);
+    }
 
 .btn-danger {
     background-color: var(--kibana-error);
@@ -402,28 +404,28 @@ html, body {
     border-collapse: collapse;
 }
 
-.table thead {
-    background-color: var(--kibana-neutral-100);
-}
+    .table thead {
+        background-color: var(--kibana-neutral-100);
+    }
 
-.table th {
-    padding: 12px 15px;
-    color: var(--kibana-neutral-600);
-    font-weight: 600;
-    font-size: 12px;
-    text-transform: uppercase;
-    border-bottom: 2px solid var(--kibana-neutral-300);
-}
+    .table th {
+        padding: 12px 15px;
+        color: var(--kibana-neutral-600);
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        border-bottom: 2px solid var(--kibana-neutral-300);
+    }
 
-.table td {
-    padding: 12px 15px;
-    border-bottom: 1px solid var(--kibana-neutral-300);
-    color: var(--kibana-neutral-700);
-}
+    .table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid var(--kibana-neutral-300);
+        color: var(--kibana-neutral-700);
+    }
 
-.table tbody tr:hover {
-    background-color: var(--kibana-neutral-100);
-}
+    .table tbody tr:hover {
+        background-color: var(--kibana-neutral-100);
+    }
 
 /* Badges */
 .badge {
@@ -521,6 +523,6 @@ html, body {
     border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: var(--kibana-neutral-500);
-}
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--kibana-neutral-500);
+    }

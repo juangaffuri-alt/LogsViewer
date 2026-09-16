@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using LogsViewer.Models;
 using LogsViewer.Services.Contracts;
+using System.Text;
 
 namespace LogsViewer.Controllers;
 
@@ -25,27 +26,37 @@ public class LogsController : Controller
         [FromQuery] string timeRange = "24h",
         [FromQuery] string[]? levels = null)
     {
+        // La sidebar (ver _Layout.cshtml) muestra ERROR/WARNING/INFO/DEBUG tildados
+        // por defecto. Si todavía no se mandó ningún "levels" en el querystring
+        // (primera visita a /logs), aplicamos ese mismo default acá; si el
+        // parámetro está presente (aunque venga vacío tras destildar todo), se
+        // respeta lo que mandó el usuario.
+        var selectedLevels = Request.Query.ContainsKey("levels")
+            ? (levels?.ToList() ?? new())
+            : new List<string> { "ERROR", "WARNING", "INFO", "DEBUG" };
+
+        var model = new LogsPageViewModel
+        {
+            CurrentPage = page < 1 ? 1 : page,
+            PageSize = pageSize <= 0 ? 50 : pageSize,
+            SearchQuery = query,
+            TimeRange = timeRange,
+            SelectedLevels = selectedLevels
+        };
+
         try
         {
-            var model = new LogsPageViewModel
-            {
-                CurrentPage = page,
-                PageSize = pageSize,
-                SearchQuery = query,
-                TimeRange = timeRange,
-                SelectedLevels = levels?.ToList() ?? new()
-            };
+            var criteria = BuildCriteria(model);
 
-            // TODO: Implementar búsqueda con filtros en el servicio
-            model.Logs = await _logService.GetLogsAsync(page, pageSize);
-            model.TotalCount = await _logService.GetLogsCountAsync();
+            model.Logs = await _logService.AdvancedSearchAsync(criteria);
+            model.TotalCount = await _logService.AdvancedSearchCountAsync(criteria);
 
             return View(model);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error loading logs");
-            return View(new LogsPageViewModel());
+            return View(model);
         }
     }
 
@@ -63,13 +74,23 @@ public class LogsController : Controller
     {
         try
         {
-            var logs = await _logService.GetLogsAsync(page, pageSize);
-            var totalCount = await _logService.GetLogsCountAsync();
+            var tempModel = new LogsPageViewModel
+            {
+                CurrentPage = page,
+                PageSize = pageSize,
+                SearchQuery = query,
+                TimeRange = timeRange,
+                SelectedLevels = levels?.ToList() ?? new()
+            };
+            var criteria = BuildCriteria(tempModel);
+
+            var logs = await _logService.AdvancedSearchAsync(criteria);
+            var totalCount = await _logService.AdvancedSearchCountAsync(criteria);
 
             return Json(new
             {
                 success = true,
-                logs = logs.Select(MapToLogViewModel),
+                logs,
                 totalCount,
                 totalPages = (totalCount + pageSize - 1) / pageSize,
                 currentPage = page
@@ -91,11 +112,7 @@ public class LogsController : Controller
         try
         {
             var logs = await _logService.GetRecentLogsAsync(count);
-            return Json(new
-            {
-                success = true,
-                logs = logs.Select(MapToLogViewModel)
-            });
+            return Json(new { success = true, logs });
         }
         catch (Exception ex)
         {
@@ -113,11 +130,7 @@ public class LogsController : Controller
         try
         {
             var stats = await _logService.GetStatisticsAsync();
-            return Json(new
-            {
-                success = true,
-                stats = MapToStatisticsViewModel(stats)
-            });
+            return Json(new { success = true, stats });
         }
         catch (Exception ex)
         {
@@ -134,10 +147,20 @@ public class LogsController : Controller
     {
         try
         {
-            var logs = await _logService.GetLogsAsync(1, 10000); // Limitar exportación
+            var model = new LogsPageViewModel
+            {
+                CurrentPage = 1,
+                PageSize = 10000, // Limitar exportación
+                SearchQuery = request.Query,
+                TimeRange = request.TimeRange,
+                SelectedLevels = request.Levels?.ToList() ?? new()
+            };
+            var criteria = BuildCriteria(model);
+
+            var logs = await _logService.AdvancedSearchAsync(criteria);
 
             var csv = GenerateCsv(logs);
-            var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+            var bytes = Encoding.UTF8.GetBytes(csv);
 
             return File(bytes, "text/csv", $"logs-export-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
         }
@@ -148,14 +171,52 @@ public class LogsController : Controller
         }
     }
 
-    private string GenerateCsv(List<LogViewModel> logs)
+    private static AdvancedSearchCriteria BuildCriteria(LogsPageViewModel model) => new()
     {
-        // TODO: Implementar generación de CSV
-        return "timestamp,level,source,message\n";
+        Query = model.SearchQuery,
+        Levels = model.SelectedLevels,
+        StartDate = GetStartDateFromTimeRange(model.TimeRange),
+        Page = model.CurrentPage,
+        PageSize = model.PageSize
+    };
+
+    private static DateTime? GetStartDateFromTimeRange(string timeRange) => timeRange switch
+    {
+        "15m" => DateTime.UtcNow.AddMinutes(-15),
+        "1h" => DateTime.UtcNow.AddHours(-1),
+        "24h" => DateTime.UtcNow.AddHours(-24),
+        "7d" => DateTime.UtcNow.AddDays(-7),
+        "30d" => DateTime.UtcNow.AddDays(-30),
+        _ => null // "custom" u otros valores no reconocidos: sin límite inferior
+    };
+
+    private static string GenerateCsv(List<LogViewModel> logs)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("timestamp,level,source,message");
+
+        foreach (var log in logs)
+        {
+            sb.AppendLine(string.Join(",",
+                EscapeCsvField(log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")),
+                EscapeCsvField(log.Level),
+                EscapeCsvField(log.Source),
+                EscapeCsvField(log.Message)));
+        }
+
+        return sb.ToString();
     }
 
-    private LogViewModel MapToLogViewModel(object log) => new();
-    private LogStatisticsViewModel MapToStatisticsViewModel(object stats) => new();
+    private static string EscapeCsvField(string? field)
+    {
+        field ??= string.Empty;
+        if (field.Contains(',') || field.Contains('"') || field.Contains('\n'))
+        {
+            return "\"" + field.Replace("\"", "\"\"") + "\"";
+        }
+
+        return field;
+    }
 }
 
 public class ExportLogsRequest

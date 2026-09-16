@@ -1,6 +1,6 @@
 ﻿@model DashboardViewModel
 @{
-    ViewData["Title"] = "Dashboard - Area 52";
+    ViewData["Title"] = "Dashboard - Logger Viewer";
 }
 
 <div class="dashboard-container">
@@ -84,7 +84,7 @@
                 <div class="log-card">
                     <div class="log-header">
                         <span class="log-level @log.Level.ToLower()">@log.Level</span>
-                        <span class="log-timestamp">@log.Timestamp:HH:mm:ss</span>
+                        <span class="log-timestamp">@log.Timestamp.ToString("HH:mm:ss")</span>
                         <span class="log-source">@log.Source</span>
                     </div>
                     <div class="log-message">@log.Message</div>
@@ -95,6 +95,23 @@
 </div>
 
 @section Scripts {
+    <script>
+        window.timelineData = {
+            timestamps: [@Html.Raw(string.Join(",", Model.TimeSeriesData.Timestamps.Select(t => $"\"{t}\"")))],
+            error: [@string.Join(",", Model.TimeSeriesData.ErrorCounts)],
+            warning: [@string.Join(",", Model.TimeSeriesData.WarningCounts)],
+            info: [@string.Join(",", Model.TimeSeriesData.InfoCounts)],
+            debug: [@string.Join(",", Model.TimeSeriesData.DebugCounts)]
+        };
+        window.levelDistribution = {
+            error: @Model.Statistics.ErrorCount,
+            warning: @Model.Statistics.WarningCount,
+            info: @Model.Statistics.InfoCount,
+            debug: @Model.Statistics.DebugCount,
+            trace: @Model.Statistics.TraceCount
+        };
+    </script>
+    <script src="~/js/charts.js"></script>
     <script src="~/js/dashboard.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {

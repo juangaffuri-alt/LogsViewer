@@ -53,5 +53,9 @@ namespace LogsViewer.Services.Contracts
         /// Búsqueda avanzada con múltiples filtros
         /// </summary>
         Task<List<LogViewModel>> AdvancedSearchAsync(AdvancedSearchCriteria criteria);
+        /// <summary>
+        /// Cuenta el total de resultados que matchean los criterios de AdvancedSearchAsync (sin paginar)
+        /// </summary>
+        Task<int> AdvancedSearchCountAsync(AdvancedSearchCriteria criteria);
     }
 }

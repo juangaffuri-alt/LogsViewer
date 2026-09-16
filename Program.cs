@@ -1,20 +1,21 @@
-﻿using LogsViewer.Services.Contracts;
+﻿using LogsViewer.Infrastructure.App;
+using LogsViewer.Infrastructure.Clef;
+using LogsViewer.Infrastructure.HostedServices;
+using LogsViewer.Services.Contracts;
 using LogsViewer.Services.Implementation;
-using Raven.Client.Documents;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-builder.Services.AddScoped<ILogService, LogService>();
+IFeatureManagement featureManagement = builder.AddFeatureManagement();
 
-var ravenDbSettings = builder.Configuration.GetSection("RavenDb");
-builder.Services.AddSingleton<IDocumentStore>(new DocumentStore
-{
-    Urls = ravenDbSettings["Urls"]?.Split(",") ?? new[] { "http://localhost:8080" },
-    Database = ravenDbSettings["Database"]
-}.Initialize());
+IBackendConfigurator backendConfigurator = BackendConfiguratorFactory.Create(builder.Configuration, featureManagement);
+backendConfigurator.GlobalSetup();
+backendConfigurator.ConfigureServices(builder);
+
+builder.Services.AddHostedService<StartupJobHostingService>();
 
 builder.Services.AddScoped<ILogService, LogService>();
 
@@ -31,6 +32,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseEventMiddleware();
 app.UseRouting();
 
 app.UseAuthorization();
