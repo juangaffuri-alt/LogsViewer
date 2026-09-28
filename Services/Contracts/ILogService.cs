@@ -56,5 +56,6 @@ namespace LogsViewer.Services.Contracts
         /// Cuenta el total de resultados que matchean los criterios de AdvancedSearchAsync (sin paginar)
         /// </summary>
         Task<int> AdvancedSearchCountAsync(AdvancedSearchCriteria criteria);
+        Task<List<string>> GetDistinctApplicationsAsync();
     }
 }

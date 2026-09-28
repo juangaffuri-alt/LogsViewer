@@ -2,6 +2,7 @@
 {
     public class AdvancedSearchCriteria
     {
+        public string? Application { get; set; }
         public string? Query { get; set; }
 
         public List<string> Levels { get; set; } = new();

@@ -37,7 +37,9 @@ public class LogsController : Controller
             PageSize = pageSize <= 0 ? 50 : pageSize,
             SearchQuery = query,
             TimeRange = prefs.TimeRange,
-            SelectedLevels = prefs.Levels
+            SelectedLevels = prefs.Levels,
+            Application = prefs.Application,                                   // 👈 nuevo
+            AvailableApplications = await _logService.GetDistinctApplicationsAsync()  // 👈 nuevo
         };
 
         try
@@ -170,7 +172,8 @@ public class LogsController : Controller
         Levels = model.SelectedLevels,
         StartDate = GetStartDateFromTimeRange(model.TimeRange),
         Page = model.CurrentPage,
-        PageSize = model.PageSize
+        PageSize = model.PageSize,
+        Application = model.Application,  // 👈 nuevo
     };
 
     private static DateTime? GetStartDateFromTimeRange(string timeRange) => timeRange switch

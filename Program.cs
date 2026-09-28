@@ -17,10 +17,9 @@ backendConfigurator.GlobalSetup();
 backendConfigurator.ConfigureServices(builder);
 
 builder.Services.AddHostedService<StartupJobHostingService>();
-
-builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<LogFilterPreferencesService>();
+builder.Services.AddScoped<ILogService, LogService>();
 
 var app = builder.Build();
 

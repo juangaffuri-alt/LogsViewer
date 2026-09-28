@@ -16,11 +16,12 @@ public class PreferencesController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult SetFilters(LogFilterPreferences prefs, string? returnUrl)
     {
-        // Si desmarcaste todos los levels, el binder deja la lista vacía o null.
-        // Decidimos: "sin niveles seleccionados" = mostrar todos (o ninguno).
-        // Aquí lo interpretamos como "todos" para que la UI no quede vacía.
         if (prefs.Levels == null || prefs.Levels.Count == 0)
             prefs.Levels = new List<string> { "VERBOSE", "DEBUG", "INFO", "WARNING", "ERROR", "FATAL" };
+
+        // El <select> manda "" cuando es "Todas"
+        if (string.IsNullOrWhiteSpace(prefs.Application))
+            prefs.Application = null;
 
         _filterService.Set(prefs);
         return LocalRedirect(returnUrl ?? "/");

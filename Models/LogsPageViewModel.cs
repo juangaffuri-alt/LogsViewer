@@ -17,5 +17,7 @@
         public List<string> SelectedLevels { get; set; } = new();
 
         public string TimeRange { get; set; } = "24h";
+        public string? Application { get; set; }
+        public List<string> AvailableApplications { get; set; } = new();
     }
 }

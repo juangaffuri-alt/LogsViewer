@@ -40,6 +40,7 @@
     {
         public string TimeRange { get; set; } = "24h";
         public List<string> Levels { get; set; } = new() { "ERROR", "WARNING", "INFO", "DEBUG" };
+        public string? Application { get; set; } = null; // null = todas
     }
 
     public enum LogLevel
@@ -50,5 +51,26 @@
         Warning,
         Error,
         Fatal
+    }
+
+    // Models/LogLevelInfo.cs
+    public static class LogLevelInfo
+    {
+        public record LevelStyle(string Icon, string Color, string DisplayName);
+
+        private static readonly Dictionary<string, LevelStyle> Styles = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["VERBOSE"] = new("bi-three-dots", "#6c757d", "Verbose"),
+            ["DEBUG"] = new("bi-bug", "#8e44ad", "Debug"),
+            ["INFO"] = new("bi-info-circle", "#0d6efd", "Info"),
+            ["WARNING"] = new("bi-exclamation-triangle", "#fd7e14", "Warning"),
+            ["ERROR"] = new("bi-x-circle", "#dc3545", "Error"),
+            ["FATAL"] = new("bi-skull", "#7f1d1d", "Fatal"),
+        };
+
+        public static LevelStyle Get(string level)
+            => Styles.TryGetValue(level, out var s) ? s : new("bi-circle", "#6c757d", level);
+
+        public static IReadOnlyCollection<string> All => Styles.Keys;
     }
 }

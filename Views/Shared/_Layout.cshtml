@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = ViewData["Title"] ?? "Logger Portal - Logs Visualization";
     var prefs = FilterService.Get();
+    var apps = FilterService.GetApplicationsCached();
     var allLevels = new[] { "VERBOSE", "DEBUG", "INFO", "WARNING", "ERROR", "FATAL" };
 }
 
@@ -27,6 +28,8 @@
 
     <!-- Page content styling (stat cards, log cards, charts) -->
     <link href="~/css/pages.css" rel="stylesheet" />
+    <!-- Bootstrap icon -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 </head>
 <body>
     <div class="kibana-container">
@@ -38,9 +41,9 @@
             </div>
 
             <div class="navbar-search">
-                <i class="fa fa-search"></i>
                 <input type="text" class="search-input" id="global-search"
-                       placeholder="🔍 Search logs..." />
+                       placeholder="🔍 Search logs..."
+                       autocomplete="off" />
             </div>
 
             <div class="navbar-menu">
@@ -98,18 +101,35 @@
                     </select>
 
                     <!-- Niveles -->
-                    <label class="form-label small mt-3">Niveles</label>
-                    @foreach (var level in allLevels)
-                    {
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox"
-                                   name="Levels" value="@level"
-                                   id="level-@level"
-                                   checked="@prefs.Levels.Contains(level)"
-                                   onchange="this.form.submit()" />
-                            <label class="form-check-label" for="level-@level">@level</label>
-                        </div>
-                    }
+                    <label class="form-label small text-uppercase fw-semibold text-muted">Niveles</label>
+                    <div class="level-filter-list">
+                        @foreach (var level in LogLevelInfo.All)
+                        {
+                            var style = LogLevelInfo.Get(level);
+                            var isChecked = prefs.Levels.Contains(level);
+                            <label class="level-filter-item" for="level-@level"
+                                   style="--level-color: @style.Color">
+                                <input class="form-check-input" type="checkbox"
+                                       name="Levels" value="@level"
+                                       id="level-@level"
+                                       checked="@isChecked" />
+                                <i class="bi @style.Icon level-icon"></i>
+                                <span class="level-name">@style.DisplayName</span>
+                            </label>
+                        }
+                    </div>
+                    <!-- Aplicación -->
+                    <select class="form-select form-select-sm mb-3" name="Application">
+                        <option value="" selected="@(prefs.Application == null)">Todas las aplicaciones</option>
+                        @foreach (var app in apps)
+                        {
+                            <option value="@app" selected="@(prefs.Application == app)">@app</option>
+                        }
+                    </select>
+                    <!-- Botón Aplicar -->
+                    <button type="submit" class="btn btn-primary btn-sm w-100 mt-6">
+                        <i class="bi bi-funnel-fill me-1"></i> Aplicar filtros
+                    </button>
                 </form>
 
                 <div class="sidebar-section">
@@ -172,5 +192,45 @@
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="~/js/kibana-app.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
+    <script>
+        (function() {
+        const input = document.getElementById('global-search');
+        if (!input) return;
+
+        // Determina a qué controlador ir según dónde estés parado
+        const currentController = '@ViewContext.RouteData.Values["controller"]';
+        // Si ya estás en Search, quedate en Search; si no, andá a Search igual
+        // (la idea es que este quick search siempre busque, no navegue a /logs)
+        const targetUrl = '/Search';
+
+        function go() {
+        const query = input.value.trim();
+        if (!query) return;
+        window.location.href = `${targetUrl}?query=${encodeURIComponent(query)}`;
+        }
+
+        // Enter dispara la búsqueda
+        input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+        e.preventDefault();
+        go();
+        }
+        // Escape limpia el input
+        if (e.key === 'Escape') {
+        input.value = '';
+        input.blur();
+        }
+        });
+
+        // Atajo Ctrl+K / Cmd+K
+        document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        input.focus();
+        input.select();
+        }
+        });
+        })();
+    </script>
 </body>
 </html>

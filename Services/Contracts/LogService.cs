@@ -375,7 +375,6 @@ public class LogService : ILogService
 
         if (criteria.StartDate.HasValue)
             query = query.Where(x => x.Timestamp >= criteria.StartDate);
-
         if (criteria.EndDate.HasValue)
             query = query.Where(x => x.Timestamp <= criteria.EndDate);
 
@@ -399,6 +398,35 @@ public class LogService : ILogService
         if (criteria.Sources.Any())
             logs = logs.Where(x => criteria.Sources.Contains(x.Source));
 
+        // 👇 NUEVO
+        if (!string.IsNullOrWhiteSpace(criteria.Application))
+            logs = logs.Where(x => string.Equals(
+                x.Application, criteria.Application, StringComparison.OrdinalIgnoreCase));
+
         return logs.ToList();
     }
+    public async Task<List<string>> GetDistinctApplicationsAsync()
+    {
+        try
+        {
+            using var session = _documentStore.OpenAsyncSession();
+            var entities = await session.Query<LogEntity>()
+                .OrderByDescending(x => x.Timestamp)
+                .Take(WorkingSetSize)
+                .ToListAsync();
+
+            return entities
+                .Select(e => MapToViewModel(e, session).Application)
+                .Where(a => !string.IsNullOrEmpty(a) && a != "Unknown")
+                .Distinct()
+                .OrderBy(a => a)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting distinct applications");
+            return new List<string>();
+        }
+    }
+
 }
