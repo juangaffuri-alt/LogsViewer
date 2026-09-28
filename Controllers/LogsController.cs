@@ -2,46 +2,42 @@
 using LogsViewer.Models;
 using LogsViewer.Services.Contracts;
 using System.Text;
+using LogsViewer.Services;
 
 namespace LogsViewer.Controllers;
 
 public class LogsController : Controller
 {
     private readonly ILogService _logService;
+    private readonly LogFilterPreferencesService _filterService;
     private readonly ILogger<LogsController> _logger;
 
-    public LogsController(ILogService logService, ILogger<LogsController> logger)
+    public LogsController(
+        ILogService logService,
+        LogFilterPreferencesService filterService,
+        ILogger<LogsController> logger)
     {
         _logService = logService;
+        _filterService = filterService;
         _logger = logger;
     }
 
-    /// <summary>
-    /// Página principal de visor de logs
-    /// </summary>
+    [HttpGet]
     public async Task<IActionResult> Index(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
-        [FromQuery] string? query = null,
-        [FromQuery] string timeRange = "24h",
-        [FromQuery] string[]? levels = null)
+        [FromQuery] string? query = null)
     {
-        // La sidebar (ver _Layout.cshtml) muestra ERROR/WARNING/INFO/DEBUG tildados
-        // por defecto. Si todavía no se mandó ningún "levels" en el querystring
-        // (primera visita a /logs), aplicamos ese mismo default acá; si el
-        // parámetro está presente (aunque venga vacío tras destildar todo), se
-        // respeta lo que mandó el usuario.
-        var selectedLevels = Request.Query.ContainsKey("levels")
-            ? (levels?.ToList() ?? new())
-            : new List<string> { "ERROR", "WARNING", "INFO", "DEBUG" };
+        // 👇 timeRange y levels YA NO vienen del querystring: vienen de la cookie
+        var prefs = _filterService.Get();
 
         var model = new LogsPageViewModel
         {
             CurrentPage = page < 1 ? 1 : page,
             PageSize = pageSize <= 0 ? 50 : pageSize,
             SearchQuery = query,
-            TimeRange = timeRange,
-            SelectedLevels = selectedLevels
+            TimeRange = prefs.TimeRange,
+            SelectedLevels = prefs.Levels
         };
 
         try
@@ -60,27 +56,24 @@ public class LogsController : Controller
         }
     }
 
-    /// <summary>
-    /// API: Obtener logs en JSON (AJAX)
-    /// </summary>
     [HttpGet("api/logs/search")]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> SearchLogs(
         [FromQuery] string? query = null,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50,
-        [FromQuery] string[]? levels = null,
-        [FromQuery] string timeRange = "24h")
+        [FromQuery] int pageSize = 50)
     {
         try
         {
+            var prefs = _filterService.Get();
+
             var tempModel = new LogsPageViewModel
             {
                 CurrentPage = page,
                 PageSize = pageSize,
                 SearchQuery = query,
-                TimeRange = timeRange,
-                SelectedLevels = levels?.ToList() ?? new()
+                TimeRange = prefs.TimeRange,
+                SelectedLevels = prefs.Levels
             };
             var criteria = BuildCriteria(tempModel);
 

@@ -17,5 +17,7 @@
         public string? Exception { get; set; }
 
         public string? StackTrace { get; set; }
+        public string Application { get; set; } = "Unknown";
+        public string SourceContext { get; set; } = "";
     }
 }

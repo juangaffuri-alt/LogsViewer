@@ -3,121 +3,165 @@
     ViewData["Title"] = "Logs - Logger Viewer";
 }
 
-<div class="logs-viewer">
+<link rel="stylesheet" href="~/css/logs.css" asp-append-version="true" />
+
+<div class="logs-page">
+
     <div class="logs-header">
-        <h1>
-            <i class="fa fa-list"></i> Logs Viewer
-        </h1>
-        <div class="header-actions">
-            <button class="btn btn-sm btn-outline-secondary" id="btn-refresh" title="Actualizar">
-                <i class="fa fa-refresh"></i> Actualizar
+        <div class="logs-header-title">
+            <h1><i class="fa fa-list-alt"></i> Logs</h1>
+            <span class="logs-count">@Model.TotalCount registros</span>
+        </div>
+        <div class="logs-toolbar">
+            <button type="button" id="btn-refresh" class="btn btn-outline-secondary">
+                <i class="fa fa-sync-alt"></i> <span>Actualizar</span>
             </button>
-            <button class="btn btn-sm btn-outline-secondary" id="btn-export" title="Exportar como CSV">
-                <i class="fa fa-download"></i> Exportar
+            <button type="button" id="btn-export" class="btn btn-outline-secondary">
+                <i class="fa fa-file-export"></i> <span>Exportar</span>
             </button>
-            <button class="btn btn-sm btn-outline-secondary" id="btn-settings-logs" title="Configurar columnas">
-                <i class="fa fa-cog"></i> Columnas
-            </button>
+            <div class="view-switch-wrapper">
+                <span class="view-switch-label">Vista:</span>
+                <div class="btn-group view-switch" role="group" aria-label="Vista">
+                    <button type="button" class="btn btn-outline-secondary view-toggle" data-view="grid">
+                        <i class="fa fa-list"></i> <span>Grilla</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary view-toggle" data-view="card">
+                        <i class="fa fa-th-large"></i> <span>Tarjetas</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Información de búsqueda -->
-    <div class="search-info">
-        @if (!string.IsNullOrEmpty(Model.SearchQuery))
-        {
-            <span class="badge bg-info">
-                <i class="fa fa-search"></i> Buscando: <strong>@Model.SearchQuery</strong>
-            </span>
-        }
-
-        <span class="badge bg-secondary">
-            Total: <strong>@Model.TotalCount</strong> resultados
-        </span>
-
-        <span class="badge bg-secondary">
-            Mostrando: <strong>@Model.Logs.Count</strong>
-        </span>
-    </div>
-
-    <!-- Filtros activos -->
-    @if (Model.SelectedLevels.Any())
+    @if (!Model.Logs.Any())
     {
-        <div class="active-filters">
-            <label>Filtros activos:</label>
-            @foreach (var level in Model.SelectedLevels)
-            {
-                <span class="filter-chip">
-                    <i class="fa fa-filter"></i> @level
-                    <button class="btn-chip-close" data-level="@level">
-                        <i class="fa fa-times"></i>
-                    </button>
-                </span>
-            }
+        <div class="logs-empty">
+            <i class="fa fa-inbox"></i>
+            <p>No hay logs para mostrar.</p>
         </div>
     }
+    else
+    {
+        <!-- Vista grilla (default) -->
+        <div id="logs-grid" class="logs-grid">
+            <table class="logs-table">
+                <thead>
+                    <tr>
+                        <th class="col-level">Nivel</th>
+                        <th class="col-timestamp">Fecha</th>
+                        <th class="col-app">Aplicación</th>
+                        <th class="col-source">Origen</th>
+                        <th class="col-message">Mensaje</th>
+                        <th class="col-actions"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < Model.Logs.Count; i++)
+                    {
+                        var log = Model.Logs[i];
+                        var level = (log.Level ?? "info").ToLower();
+                        var propsId = $"props-{i}";
+                        var hasProps = log.Properties != null && log.Properties.Any();
+                        var hasException = !string.IsNullOrWhiteSpace(log.Exception);
 
-    <!-- Lista de Logs -->
-    <div class="logs-container">
-        @if (Model.Logs.Any())
-        {
-            <div class="logs-list" id="logs-list">
-                @foreach (var log in Model.Logs)
-                {
-                    <div class="log-card" data-id="@log.Id">
-                        <div class="log-header">
-                            <span class="log-level @log.Level.ToLower()">
-                                <i class="fa fa-@GetLogIcon(log.Level)"></i>
-                                @log.Level
-                            </span>
-                            <span class="log-timestamp">@log.Timestamp:yyyy-MM-dd HH:mm:ss.fff</span>
-                            <span class="log-source">@log.Source</span>
-                        </div>
-                        <div class="log-message">@log.Message</div>
-
-                        @if (log.Properties?.Any() ?? false)
-                        {
-                            <details class="log-details">
-                                <summary><i class="fa fa-chevron-right"></i> Propiedades (@log.Properties.Count)</summary>
-                                <div class="log-properties">
-                                    @foreach (var prop in log.Properties)
-                                    {
-                                        <div class="property-item">
-                                            <span class="property-key">@prop.Key:</span>
-                                            <span class="property-value">@prop.Value</span>
-                                        </div>
-                                    }
-                                </div>
-                            </details>
-                        }
-
-                        @if (!string.IsNullOrEmpty(log.Exception))
-                        {
-                            <details class="log-exception">
-                                <summary><i class="fa fa-exclamation-circle"></i> Excepción</summary>
-                                <pre class="exception-text">@log.Exception</pre>
-                                @if (!string.IsNullOrEmpty(log.StackTrace))
+                        <tr class="log-row level-@level">
+                            <td><span class="log-level @level">@log.Level</span></td>
+                            <td class="log-timestamp">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</td>
+                            <td class="log-app">@log.Application</td>
+                            <td class="log-source">@log.Source</td>
+                            <td class="log-message">@log.Message</td>
+                            <td class="log-actions">
+                                @if (hasProps)
                                 {
-                                    <details>
-                                        <summary>Stack Trace</summary>
-                                        <pre class="stack-trace">@log.StackTrace</pre>
-                                    </details>
+                                    <button type="button" class="btn-expand" data-target="@propsId" title="Propiedades">
+                                        <i class="fa fa-chevron-down"></i>
+                                    </button>
                                 }
-                            </details>
-                        }
-                    </div>
-                }
-            </div>
-        }
-        else
-        {
-            <div class="empty-state">
-                <i class="fa fa-inbox"></i>
-                <h4>No hay logs disponibles</h4>
-                <p>No se encontraron logs con los filtros actuales</p>
-            </div>
-        }
+                            </td>
+                        </tr>
 
-        <!-- Paginación -->
+                        @if (hasException)
+                        {
+                            var exText = log.Exception!.Trim();
+                            var firstNl = exText.IndexOf('\n');
+                            var exMessage = firstNl > 0 ? exText[..firstNl].Trim() : exText;
+                            var exStack = firstNl > 0 ? exText[(firstNl + 1)..].Trim() : null;
+
+                            <tr class="log-exception-row">
+                                <td colspan="5">
+                                    <div class="log-exception">
+                                        <div class="log-exception-header">
+                                            <i class="fa fa-exclamation-triangle"></i>
+                                            <span>Excepción</span>
+                                            <button type="button" class="btn-copy" title="Copiar"
+                                                    data-copy="@exText.Replace("\"", "&quot;")">
+                                                <i class="fa fa-copy"></i>
+                                            </button>
+                                        </div>
+                                        <div class="log-exception-message">@exMessage</div>
+                                        @if (!string.IsNullOrWhiteSpace(exStack))
+                                        {
+                                            <pre class="log-exception-stack">@exStack</pre>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+
+                        @if (hasProps)
+                        {
+                            <tr class="log-details-row" id="@propsId" hidden>
+                                <td colspan="5">
+                                    <div class="log-props-header">Propiedades</div>
+                                    <pre>@System.Text.Json.JsonSerializer.Serialize(log.Properties,
+                                        new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Vista tarjetas (alternativa) -->
+        <div id="logs-card" class="logs-card" hidden>
+            @foreach (var log in Model.Logs)
+            {
+                var level = (log.Level ?? "info").ToLower();
+                var hasProps = log.Properties != null && log.Properties.Any();
+                var hasException = !string.IsNullOrWhiteSpace(log.Exception);
+
+                <div class="log-card level-@level">
+                    <div class="log-card-header">
+                        <span class="log-level @level">@log.Level</span>
+                        <span class="log-timestamp">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</span>
+                        <span class="log-source">@log.Source</span>
+                    </div>
+                    <div class="log-card-message">@log.Message</div>
+
+                    @if (hasException)
+                    {
+                        <div class="log-exception">
+                            <div class="log-exception-header">
+                                <i class="fa fa-exclamation-triangle"></i> Excepción
+                            </div>
+                            <pre>@log.Exception</pre>
+                        </div>
+                    }
+
+                    @if (hasProps)
+                    {
+                        <details class="log-details">
+                            <summary>Propiedades</summary>
+                            <pre>@System.Text.Json.JsonSerializer.Serialize(log.Properties,
+                                new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+                        </details>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Paginación server-side (igual que antes) -->
         @if (Model.TotalPages > 1)
         {
             <nav class="logs-pagination" aria-label="Page navigation">
@@ -135,16 +179,12 @@
                             </a>
                         </li>
                     }
-
                     @for (int i = Math.Max(1, Model.CurrentPage - 2); i <= Math.Min(Model.TotalPages, Model.CurrentPage + 2); i++)
                     {
                         <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
-                            <a class="page-link" href="@Url.Action("Index", new { page = i, pageSize = Model.PageSize, query = Model.SearchQuery })">
-                                @i
-                            </a>
+                            <a class="page-link" href="@Url.Action("Index", new { page = i, pageSize = Model.PageSize, query = Model.SearchQuery })">@i</a>
                         </li>
                     }
-
                     @if (Model.CurrentPage < Model.TotalPages)
                     {
                         <li class="page-item">
@@ -161,30 +201,30 @@
                 </ul>
             </nav>
         }
-    </div>
+    }
 </div>
 
 @section Scripts {
     <script src="~/js/logs-viewer.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-        LogsViewer.init({
-        currentPage: @Model.CurrentPage,
-        pageSize: @Model.PageSize,
-        totalCount: @Model.TotalCount
+        document.addEventListener('DOMContentLoaded', function () {
+            LogsViewer.init({
+                currentPage: @Model.CurrentPage,
+                pageSize: @Model.PageSize,
+                totalCount: @Model.TotalCount
+            });
         });
+        document.querySelectorAll('.btn-copy').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const text = e.currentTarget.dataset.copy;
+                navigator.clipboard.writeText(text).then(() => {
+                const icon = e.currentTarget.querySelector('i');
+                if (!icon) return;
+                const original = icon.className;
+                icon.className = 'fa fa-check';
+                setTimeout(() => { icon.className = original; }, 1200);
+                });
+            });
         });
     </script>
-}
-
-@functions {
-    private string GetLogIcon(string level) => level.ToUpper() switch
-    {
-        "ERROR" => "times-circle",
-        "WARNING" => "exclamation-triangle",
-        "INFO" => "info-circle",
-        "DEBUG" => "bug",
-        "TRACE" => "code",
-        _ => "circle"
-    };
 }

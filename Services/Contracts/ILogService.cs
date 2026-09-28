@@ -27,8 +27,8 @@ namespace LogsViewer.Services.Contracts
         /// <summary>
         /// Obtiene estadísticas de logs
         /// </summary>
-        Task<LogStatisticsViewModel> GetStatisticsAsync();
-
+        Task<LogStatisticsViewModel> GetStatisticsAsync(DateTime? from = null, DateTime? to = null);
+        
         /// <summary>
         /// Obtiene datos de línea de tiempo para gráficos
         /// </summary>
@@ -37,8 +37,7 @@ namespace LogsViewer.Services.Contracts
         /// <summary>
         /// Obtiene los errores más frecuentes
         /// </summary>
-        Task<List<TopErrorViewModel>> GetTopErrorsAsync(int limit = 10);
-
+        Task<List<TopErrorViewModel>> GetTopErrorsAsync(int limit = 10, DateTime? from = null, DateTime? to = null);
         /// <summary>
         /// Filtra logs por nivel
         /// </summary>

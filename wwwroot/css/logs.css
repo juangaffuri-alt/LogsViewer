@@ -1,0 +1,381 @@
+﻿.logs-page {
+    padding: 1.5rem;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.logs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.logs-header-title {
+    display: flex;
+    align-items: baseline;
+    gap: .75rem;
+}
+
+    .logs-header-title h1 {
+        font-size: 1.5rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+    }
+
+.logs-count {
+    color: #6c757d;
+    font-size: .875rem;
+}
+
+.logs-toolbar {
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+    .logs-toolbar .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        font-size: .875rem;
+        padding: .375rem .75rem;
+    }
+
+/* Switch con label */
+.view-switch-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    margin-left: .5rem;
+}
+
+.view-switch-label {
+    font-size: .875rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.view-switch .view-toggle.active {
+    background-color: #0d6efd;
+    color: #fff;
+    border-color: #0d6efd;
+}
+
+/* ===== Vista grilla ===== */
+.logs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: .85rem;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+    .logs-table thead {
+        background: #f8f9fa;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    .logs-table th {
+        padding: .6rem .75rem;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+        white-space: nowrap;
+    }
+
+    .logs-table td {
+        padding: .5rem .75rem;
+        border-bottom: 1px solid #f1f3f5;
+        vertical-align: top;
+    }
+
+    .logs-table tbody tr.log-row:hover {
+        background: #f8f9fa;
+    }
+
+    .logs-table .log-message {
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-width: 900px;
+    }
+
+    .logs-table .log-timestamp,
+    .logs-table .log-source {
+        white-space: nowrap;
+    }
+
+/* Colores por nivel */
+.log-row.level-error {
+    border-left: 3px solid #dc3545;
+}
+
+.log-row.level-warning {
+    border-left: 3px solid #ffc107;
+}
+
+.log-row.level-information,
+.log-row.level-info {
+    border-left: 3px solid #0dcaf0;
+}
+
+.log-row.level-debug {
+    border-left: 3px solid #6c757d;
+}
+
+.log-row.level-fatal {
+    border-left: 3px solid #6f42c1;
+}
+
+.log-level {
+    display: inline-block;
+    padding: .15rem .5rem;
+    border-radius: 3px;
+    font-size: .7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+}
+
+    .log-level.error {
+        background: #f8d7da;
+        color: #842029;
+    }
+
+    .log-level.warning {
+        background: #fff3cd;
+        color: #664d03;
+    }
+
+    .log-level.information,
+    .log-level.info {
+        background: #cff4fc;
+        color: #055160;
+    }
+
+    .log-level.debug {
+        background: #e2e3e5;
+        color: #41464b;
+    }
+
+    .log-level.fatal {
+        background: #e2d9f3;
+        color: #432874;
+    }
+
+.btn-expand {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6c757d;
+    padding: .2rem .4rem;
+    transition: transform .2s;
+}
+
+    .btn-expand.expanded {
+        transform: rotate(180deg);
+    }
+
+/* ===== Fila de excepción (siempre visible) ===== */
+.log-exception-row td {
+    background: #fff5f5;
+    border-bottom: 1px solid #f1f3f5;
+    padding: .3rem .75rem .45rem 2.5rem;
+    line-height: 1;
+}
+
+.log-exception {
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+    border-left: 3px solid #dc3545;
+    background: #fff;
+    padding: .5rem .7rem .55rem .9rem;
+    border-radius: 3px;
+    font-size: .82rem;
+    line-height: 1.4;
+}
+
+.log-exception-header {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    color: #842029;
+    font-weight: 700;
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    line-height: 1;
+    margin: 0;
+}
+
+    .log-exception-header .btn-copy {
+        margin-left: auto;
+        background: none;
+        border: none;
+        color: #842029;
+        opacity: .45;
+        cursor: pointer;
+        padding: 0 .2rem;
+        font-size: .85rem;
+        line-height: 1;
+    }
+
+        .log-exception-header .btn-copy:hover {
+            opacity: 1;
+        }
+
+.log-exception-message {
+    color: #842029;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-weight: 600;
+    font-size: .82rem;
+    margin: 0;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+/* Reset duro contra Bootstrap */
+.log-exception-stack {
+    margin: 0 !important;
+    padding: .4rem .55rem !important;
+    background: #fff8f8;
+    border-radius: 2px;
+    font-size: .75rem;
+    line-height: 1.35;
+    color: #6c2b30;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow: visible; /* mata el scroll de Bootstrap */
+    max-height: none; /* mata cualquier límite previo */
+}
+.log-exception-stack-wrap summary {
+    cursor: pointer;
+    font-size: .7rem;
+    color: #842029;
+    opacity: .75;
+    list-style: none;
+    padding: .15rem 0;
+}
+
+    .log-exception-stack-wrap summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .log-exception-stack-wrap summary::before {
+        content: "▸ ";
+    }
+
+.log-exception-stack-wrap[open] summary::before {
+    content: "▾ ";
+}
+
+/* ===== Fila de propiedades (expandible) ===== */
+.log-details-row td {
+    background: #f8f9fa;
+    padding: .75rem 1.5rem;
+}
+
+.log-details-row pre {
+    margin: 0;
+    font-size: .78rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.log-props-header {
+    font-weight: 600;
+    font-size: .8rem;
+    color: #495057;
+    margin-bottom: .4rem;
+}
+
+/* ===== Vista tarjetas ===== */
+.logs-card {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+}
+
+.log-card {
+    border: 1px solid #dee2e6;
+    border-left: 4px solid #6c757d;
+    border-radius: 4px;
+    padding: .75rem 1rem;
+    background: #fff;
+}
+
+    .log-card.level-error {
+        border-left-color: #dc3545;
+    }
+
+    .log-card.level-warning {
+        border-left-color: #ffc107;
+    }
+
+    .log-card.level-information,
+    .log-card.level-info {
+        border-left-color: #0dcaf0;
+    }
+
+    .log-card.level-fatal {
+        border-left-color: #6f42c1;
+    }
+
+.log-card-header {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: .5rem;
+    font-size: .85rem;
+    flex-wrap: wrap;
+}
+
+.log-card-message {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: .875rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.log-card .log-exception {
+    margin-top: .6rem;
+}
+
+.log-details summary {
+    cursor: pointer;
+    color: #0d6efd;
+    font-size: .85rem;
+    margin-top: .5rem;
+}
+
+.log-details pre {
+    background: #f8f9fa;
+    padding: .75rem;
+    border-radius: 4px;
+    font-size: .8rem;
+    margin-top: .5rem;
+    white-space: pre-wrap;
+}
+
+/* ===== Empty state ===== */
+.logs-empty {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+}
+
+    .logs-empty i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        display: block;
+    }

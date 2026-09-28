@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using LogsViewer.Models;
+﻿using LogsViewer.Models;
+using LogsViewer.Services;
 using LogsViewer.Services.Contracts;
+using Microsoft.AspNetCore.Mvc;
 
 namespace LogsViewer.Controllers;
 
@@ -15,20 +16,22 @@ public class HomeController : Controller
         _logger = logger;
     }
 
-    /// <summary>
-    /// Página de Discover - Vista principal con estadísticas y logs recientes
-    /// </summary>
     public async Task<IActionResult> Index()
     {
         try
         {
-            var stats = await _logService.GetStatisticsAsync();
+            var to = DateTime.UtcNow;
+            var from = to.AddHours(-24);
+
+            var stats = await _logService.GetStatisticsAsync(from, to);
             var recentLogs = await _logService.GetRecentLogsAsync(10);
+            var timeSeriesData = await _logService.GetTimeSeriesDataAsync("24h");
 
             var model = new DashboardViewModel
             {
-                Statistics = MapToStatisticsViewModel(stats),
-                RecentLogs = recentLogs.Select(MapToLogViewModel).ToList()
+                Statistics = stats,
+                RecentLogs = recentLogs,
+                TimeSeriesData = timeSeriesData
             };
 
             return View(model);
@@ -39,7 +42,5 @@ public class HomeController : Controller
             return View(new DashboardViewModel());
         }
     }
-
-    private LogViewModel MapToLogViewModel(object log) => new();
-    private LogStatisticsViewModel MapToStatisticsViewModel(object stats) => new();
+    
 }

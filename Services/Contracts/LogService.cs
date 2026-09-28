@@ -1,9 +1,9 @@
 ﻿using LogsViewer.Models;
 using LogsViewer.Services.Contracts;
-using Microsoft.Extensions.Logging;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Linq;
 using Raven.Client.Documents.Session;
+using LogLevel = LogsViewer.Models.LogLevel;
 
 namespace LogsViewer.Services.Implementation;
 
@@ -105,43 +105,66 @@ public class LogService : ILogService
         }
     }
 
-    public async Task<LogStatisticsViewModel> GetStatisticsAsync()
+    public async Task<LogStatisticsViewModel> GetStatisticsAsync(DateTime? from = null, DateTime? to = null)
     {
-        try
+        using var session = _documentStore.OpenAsyncSession();
+        var query = session.Query<LogEntity>();
+
+        if (from.HasValue) query = query.Where(x => x.Timestamp >= from);
+        if (to.HasValue) query = query.Where(x => x.Timestamp <= to);
+
+        var entities = await query
+            .OrderByDescending(x => x.Timestamp)
+            .Take(WorkingSetSize)
+            .ToListAsync();
+
+        var logs = entities.Select(e => MapToViewModel(e, session)).ToList();
+
+        var total = logs.Count == 0 ? 1 : logs.Count; // evitar div/0
+        return new LogStatisticsViewModel
         {
-            using var session = _documentStore.OpenAsyncSession();
-            var entities = await session.Query<LogEntity>()
-                .OrderByDescending(x => x.Timestamp)
-                .Take(WorkingSetSize)
-                .ToListAsync();
+            TotalLogs = logs.Count,
+            ErrorCount = logs.Count(x => x.Level == "ERROR"),
+            WarningCount = logs.Count(x => x.Level == "WARNING"),
+            InfoCount = logs.Count(x => x.Level == "INFO"),
+            DebugCount = logs.Count(x => x.Level == "DEBUG"),
+            TraceCount = logs.Count(x => x.Level == "TRACE"),
+            LogsBySource = logs.GroupBy(x => x.Source).ToDictionary(g => g.Key, g => g.Count()),
+            LogsByHour = logs
+                .GroupBy(x => x.Timestamp.ToString("yyyy-MM-dd HH:00"))
+                .OrderByDescending(g => g.Key)
+                .Take(24)
+                .ToDictionary(g => g.Key, g => g.Count())
+        };
+    }
 
-            var logs = entities.Select(e => MapToViewModel(e, session)).ToList();
+    public async Task<List<TopErrorViewModel>> GetTopErrorsAsync(int limit = 10, DateTime? from = null, DateTime? to = null)
+    {
+        using var session = _documentStore.OpenAsyncSession();
+        var query = session.Query<LogEntity>()
+            .Where(x => x.LevelNumeric == (int)LogLevel.Error || x.LevelNumeric == (int)LogLevel.Fatal);
 
-            var stats = new LogStatisticsViewModel
+        if (from.HasValue) query = query.Where(x => x.Timestamp >= from);
+        if (to.HasValue) query = query.Where(x => x.Timestamp <= to);
+
+        var entities = await query
+            .OrderByDescending(x => x.Timestamp)
+            .Take(WorkingSetSize)
+            .ToListAsync();
+
+        var errors = entities.Select(e => MapToViewModel(e, session)).ToList();
+
+        return errors
+            .GroupBy(x => x.Message)
+            .OrderByDescending(g => g.Count())
+            .Take(limit)
+            .Select(g => new TopErrorViewModel
             {
-                TotalLogs = logs.Count,
-                ErrorCount = logs.Count(x => x.Level == "ERROR"),
-                WarningCount = logs.Count(x => x.Level == "WARNING"),
-                InfoCount = logs.Count(x => x.Level == "INFO"),
-                DebugCount = logs.Count(x => x.Level == "DEBUG"),
-                TraceCount = logs.Count(x => x.Level == "TRACE"),
-                LogsBySource = logs
-                    .GroupBy(x => x.Source)
-                    .ToDictionary(g => g.Key, g => g.Count()),
-                LogsByHour = logs
-                    .GroupBy(x => x.Timestamp.ToString("yyyy-MM-dd HH:00"))
-                    .OrderByDescending(g => g.Key)
-                    .Take(24)
-                    .ToDictionary(g => g.Key, g => g.Count())
-            };
-
-            return stats;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting statistics");
-            return new LogStatisticsViewModel();
-        }
+                Message = g.Key,
+                Count = g.Count(),
+                Source = g.FirstOrDefault()?.Source ?? "Unknown"
+            })
+            .ToList();
     }
 
     public async Task<TimeSeriesDataViewModel> GetTimeSeriesDataAsync(string timeRange = "24h")
@@ -149,6 +172,7 @@ public class LogService : ILogService
         try
         {
             var startDate = GetStartDateFromTimeRange(timeRange);
+            var (bucketFormat, bucketDuration) = GetBucketConfig(timeRange);
 
             using var session = _documentStore.OpenAsyncSession();
             var entities = await session.Query<LogEntity>()
@@ -158,18 +182,23 @@ public class LogService : ILogService
 
             var logs = entities.Select(e => MapToViewModel(e, session)).ToList();
 
-            var groupedData = logs
-                .GroupBy(x => x.Timestamp.ToString("yyyy-MM-dd HH:00"))
-                .OrderBy(g => g.Key)
-                .ToList();
+            // Generar buckets vacíos (incluyendo los que no tienen logs) para que la
+            // línea del tiempo quede continua, sin "saltos" entre huecos de datos.
+            var bucketKeys = new List<string>();
+            for (var t = startDate; t <= DateTime.UtcNow; t = t.Add(bucketDuration))
+                bucketKeys.Add(t.ToString(bucketFormat));
+
+            var lookup = logs
+                .GroupBy(x => x.Timestamp.ToString(bucketFormat))
+                .ToDictionary(g => g.Key, g => g.ToList());
 
             return new TimeSeriesDataViewModel
             {
-                Timestamps = groupedData.Select(g => g.Key).ToList(),
-                ErrorCounts = groupedData.Select(g => g.Count(x => x.Level == "ERROR")).ToList(),
-                WarningCounts = groupedData.Select(g => g.Count(x => x.Level == "WARNING")).ToList(),
-                InfoCounts = groupedData.Select(g => g.Count(x => x.Level == "INFO")).ToList(),
-                DebugCounts = groupedData.Select(g => g.Count(x => x.Level == "DEBUG")).ToList()
+                Timestamps = bucketKeys,
+                ErrorCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == "ERROR") : 0).ToList(),
+                WarningCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == "WARNING") : 0).ToList(),
+                InfoCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == "INFO") : 0).ToList(),
+                DebugCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == "DEBUG") : 0).ToList()
             };
         }
         catch (Exception ex)
@@ -179,38 +208,17 @@ public class LogService : ILogService
         }
     }
 
-    public async Task<List<TopErrorViewModel>> GetTopErrorsAsync(int limit = 10)
+    private static (string format, TimeSpan duration) GetBucketConfig(string timeRange) => timeRange switch
     {
-        try
-        {
-            using var session = _documentStore.OpenAsyncSession();
-            var entities = await session.Query<LogEntity>()
-                .Where(x => x.LevelNumeric == (int)LogLevel.Error || x.LevelNumeric == (int)LogLevel.Critical)
-                .OrderByDescending(x => x.Timestamp)
-                .Take(1000)
-                .ToListAsync();
+        "15m" => ("yyyy-MM-dd HH:mm", TimeSpan.FromMinutes(1)),
+        "1h" => ("yyyy-MM-dd HH:mm", TimeSpan.FromMinutes(5)),
+        "24h" => ("yyyy-MM-dd HH:00", TimeSpan.FromHours(1)),
+        "7d" => ("yyyy-MM-dd HH:00", TimeSpan.FromHours(6)),
+        "30d" => ("yyyy-MM-dd", TimeSpan.FromDays(1)),
+        _ => ("yyyy-MM-dd HH:00", TimeSpan.FromHours(1))
+    };
 
-            var errors = entities.Select(e => MapToViewModel(e, session)).ToList();
-
-            return errors
-                .GroupBy(x => x.Message)
-                .OrderByDescending(g => g.Count())
-                .Take(limit)
-                .Select(g => new TopErrorViewModel
-                {
-                    Message = g.Key,
-                    Count = g.Count(),
-                    Source = g.FirstOrDefault()?.Source ?? "Unknown"
-                })
-                .ToList();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting top errors");
-            return new List<TopErrorViewModel>();
-        }
-    }
-
+    
     public async Task<List<LogViewModel>> GetLogsByLevelAsync(string level, int limit = 100)
     {
         try
@@ -282,15 +290,26 @@ public class LogService : ILogService
     /// </summary>
     private static LogViewModel MapToViewModel(LogEntity entity, IAsyncDocumentSession session)
     {
-        string source = entity.Properties
-            .Where(p => p.Name is "Application" or "SourceContext" or "MachineName")
+        string? GetProp(params string[] names) => entity.Properties
+            .Where(p => names.Contains(p.Name))
             .Select(p => p.GetValueString())
-            .FirstOrDefault(v => !string.IsNullOrEmpty(v)) ?? "Unknown";
+            .FirstOrDefault(v => !string.IsNullOrEmpty(v));
+
+        var application = GetProp("Application") ?? "Unknown";
+        var sourceContext = GetProp("SourceContext");
+        var machine = GetProp("MachineName");
+
+        // Source = Application por defecto; si querés la clase, cambiá esta línea.
+        var source = application != "Unknown"
+            ? application
+            : (sourceContext ?? machine ?? "Unknown");
 
         return new LogViewModel
         {
             Id = session.Advanced.GetDocumentId(entity) ?? string.Empty,
-            Timestamp = entity.Timestamp.UtcDateTime,
+            Application = GetProp("Application") ?? "Unknown",
+            SourceContext = GetProp("SourceContext") ?? "",
+            Timestamp = entity.Timestamp.LocalDateTime,
             Level = MapLevelBucket(entity.LevelNumeric),
             Message = entity.Message,
             Source = source,
@@ -306,12 +325,12 @@ public class LogService : ILogService
     /// </summary>
     private static string MapLevelBucket(int levelNumeric) => (LogLevel)levelNumeric switch
     {
-        LogLevel.Trace => "TRACE",
+
         LogLevel.Debug => "DEBUG",
         LogLevel.Information => "INFO",
         LogLevel.Warning => "WARNING",
         LogLevel.Error => "ERROR",
-        LogLevel.Critical => "ERROR",
+        LogLevel.Fatal => "FATAL",
         _ => "INFO"
     };
 

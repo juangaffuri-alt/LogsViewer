@@ -15,22 +15,21 @@ public class DashboardController : Controller
         _logger = logger;
     }
 
-    /// <summary>
-    /// Dashboard principal con gráficos y estadísticas
-    /// </summary>
     public async Task<IActionResult> Index([FromQuery] string timeRange = "24h")
     {
         try
         {
-            var stats = await _logService.GetStatisticsAsync();
+            var (from, to) = ParseTimeRange(timeRange);
+
+            var stats = await _logService.GetStatisticsAsync(from, to);
             var recentLogs = await _logService.GetRecentLogsAsync(20);
-            var timeSeriesData = await GetTimeSeriesDataAsync(timeRange);
-            var topErrors = await GetTopErrorsAsync();
+            var timeSeriesData = await _logService.GetTimeSeriesDataAsync(timeRange);
+            var topErrors = await _logService.GetTopErrorsAsync(10, from, to);
 
             var model = new DashboardViewModel
             {
-                Statistics = MapToStatisticsViewModel(stats),
-                RecentLogs = recentLogs.Select(MapToLogViewModel).ToList(),
+                Statistics = stats,
+                RecentLogs = recentLogs,
                 TimeSeriesData = timeSeriesData,
                 TopErrors = topErrors
             };
@@ -44,54 +43,33 @@ public class DashboardController : Controller
         }
     }
 
-    /// <summary>
-    /// API: Datos de línea de tiempo para gráficos
-    /// </summary>
     [HttpGet("api/dashboard/timeline")]
     public async Task<IActionResult> GetTimeline([FromQuery] string timeRange = "24h")
     {
-        try
-        {
-            var data = await GetTimeSeriesDataAsync(timeRange);
-            return Json(new { success = true, data });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting timeline");
-            return Json(new { success = false, error = ex.Message });
-        }
+        var data = await _logService.GetTimeSeriesDataAsync(timeRange);
+        return Json(new { success = true, data });
     }
 
-    /// <summary>
-    /// API: Top errores
-    /// </summary>
     [HttpGet("api/dashboard/top-errors")]
-    public async Task<IActionResult> GetTopErrors([FromQuery] int limit = 10)
+    public async Task<IActionResult> GetTopErrors([FromQuery] int limit = 10, [FromQuery] string timeRange = "24h")
     {
-        try
+        var (from, to) = ParseTimeRange(timeRange);
+        var errors = await _logService.GetTopErrorsAsync(limit, from, to);
+        return Json(new { success = true, errors });
+    }
+
+    private static (DateTime from, DateTime to) ParseTimeRange(string timeRange)
+    {
+        var to = DateTime.UtcNow;
+        var from = timeRange switch
         {
-            var errors = await GetTopErrorsAsync(limit);
-            return Json(new { success = true, errors });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting top errors");
-            return Json(new { success = false, error = ex.Message });
-        }
+            "15m" => to.AddMinutes(-15),
+            "1h" => to.AddHours(-1),
+            "24h" => to.AddHours(-24),
+            "7d" => to.AddDays(-7),
+            "30d" => to.AddDays(-30),
+            _ => to.AddHours(-24)
+        };
+        return (from, to);
     }
-
-    private async Task<TimeSeriesDataViewModel> GetTimeSeriesDataAsync(string timeRange)
-    {
-        // TODO: Implementar en el servicio
-        return await Task.FromResult(new TimeSeriesDataViewModel());
-    }
-
-    private async Task<List<TopErrorViewModel>> GetTopErrorsAsync(int limit = 10)
-    {
-        // TODO: Implementar en el servicio
-        return await Task.FromResult(new List<TopErrorViewModel>());
-    }
-
-    private LogViewModel MapToLogViewModel(object log) => new();
-    private LogStatisticsViewModel MapToStatisticsViewModel(object stats) => new();
 }

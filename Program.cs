@@ -1,6 +1,7 @@
 ﻿using LogsViewer.Infrastructure.App;
 using LogsViewer.Infrastructure.Clef;
 using LogsViewer.Infrastructure.HostedServices;
+using LogsViewer.Services;
 using LogsViewer.Services.Contracts;
 using LogsViewer.Services.Implementation;
 
@@ -18,6 +19,8 @@ backendConfigurator.ConfigureServices(builder);
 builder.Services.AddHostedService<StartupJobHostingService>();
 
 builder.Services.AddScoped<ILogService, LogService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<LogFilterPreferencesService>();
 
 var app = builder.Build();
 
