@@ -32,16 +32,12 @@ public static class LogLevelExtensions
         var v = value?.Trim().ToLowerInvariant();
         return v switch
         {
-            "verbose" => LogLevel.Verbose,
-            "debug" => LogLevel.Debug,
-            "info" => LogLevel.Information,
-            "information" => LogLevel.Information,
-            "informational" => LogLevel.Information,
-            "warn" => LogLevel.Warning,
-            "warning" => LogLevel.Warning,
-            "error" => LogLevel.Error,
-            "fatal" => LogLevel.Fatal,
-            "critical" => LogLevel.Fatal,
+            "verbose" or "trace" or "v" => LogLevel.Verbose,
+            "debug" or "dbg" or "d" => LogLevel.Debug,
+            "info" or "information" or "informational" or "i" => LogLevel.Information,
+            "warn" or "warning" or "w" => LogLevel.Warning,
+            "error" or "err" or "e" => LogLevel.Error,
+            "fatal" or "critical" or "crit" or "f" => LogLevel.Fatal,
             _ => LogLevel.Information
         };
     }

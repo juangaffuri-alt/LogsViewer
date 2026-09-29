@@ -305,13 +305,14 @@ public class LogService : ILogService
             ? application
             : (sourceContext ?? machine ?? "Unknown");
 
+
         return new LogViewModel
         {
             Id = session.Advanced.GetDocumentId(entity) ?? string.Empty,
-            Application = GetProp("Application") ?? "Unknown",
+            Application = application,
             SourceContext = GetProp("SourceContext") ?? "",
             Timestamp = entity.Timestamp.LocalDateTime,
-            Level = LogLevelExtensions.FromQueryString(GetProp("Level")),
+            Level = LogLevelExtensions.FromQueryString(entity.Level),
             Message = entity.Message,
             Source = source,
             Exception = entity.Exception,
@@ -384,7 +385,16 @@ public class LogService : ILogService
             .Take(WorkingSetSize)
             .ToListAsync();
 
+        foreach (var e in entities.Take(5))
+        {
+            _logger.LogInformation("Log crudo: Level={Level}, LevelNumeric={Num}",
+                e.Level, e.LevelNumeric);
+        }
+
         var logs = entities.Select(e => MapToViewModel(e, session)).AsEnumerable();
+
+        _logger.LogInformation("Filtro: Query={Query}, Application={App}, Levels={Levels}, Logs antes={Count}",
+    criteria.Query, criteria.Application, string.Join(",", criteria.Levels), logs.Count());
 
         if (!string.IsNullOrWhiteSpace(criteria.Query))
         {
@@ -393,12 +403,13 @@ public class LogService : ILogService
                 x.Source.Contains(criteria.Query, StringComparison.OrdinalIgnoreCase));
         }
 
+        _logger.LogInformation("Filtro aplicado: {Count} logs después", logs.Count());
+
         if (criteria.Levels.Any())
         {
-            // criteria.Levels es List<LogLevel>; x.Level en el ViewModel sigue siendo string.
-            // Comparamos usando la extensión ToQueryString para que "informational" no rompa.
-            var levelStrings = criteria.Levels.Select(l => l.ToQueryString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            logs = logs.Where(x => levelStrings.Contains(x.Level.ToString()));
+            var selected = criteria.Levels.ToHashSet();
+            logs = logs.Where(x =>
+                selected.Contains(LogLevelExtensions.FromQueryString(x.Level.ToQueryString())));
         }
 
         if (criteria.Sources.Any())

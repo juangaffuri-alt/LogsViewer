@@ -6,7 +6,19 @@
 <link rel="stylesheet" href="~/css/logs.css" asp-append-version="true" />
 
 <div class="logs-page">
-
+    @if (!string.IsNullOrWhiteSpace(Model.SearchQuery))
+    {
+        <div class="alert alert-info d-flex align-items-center justify-content-between py-2 mb-3">
+            <span>
+                <i class="bi bi-search me-1"></i>
+                Resultados para: <strong>@Model.SearchQuery</strong>
+                <span class="text-muted ms-2">(@Model.TotalCount logs)</span>
+            </span>
+            <a href="/logs" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-x"></i> Limpiar
+            </a>
+        </div>
+    }
     <div class="logs-header">
         <div class="logs-header-title">
             <h1><i class="fa fa-list-alt"></i> Logs</h1>
@@ -67,9 +79,15 @@
                         <tr class="log-row level-@level">
                             <td><span class="log-level @level">@log.Level.ToDisplay()</span></td>
                             <td class="log-timestamp">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</td>
-                            <td class="log-app">@log.Application</td>
-                            <td class="log-source">@log.Source</td>
-                            <td class="log-message">@log.Message</td>
+                            <td class="log-app">
+                                @HighlightHelper.Highlight(log.Application, Model.SearchQuery)
+                            </td>
+                            <td class="log-source">
+                                @HighlightHelper.Highlight(log.Source, Model.SearchQuery)
+                            </td>
+                            <td class="log-message">
+                                @HighlightHelper.Highlight(log.Message, Model.SearchQuery)
+                            </td>
                             <td class="log-actions">
                                 @if (hasProps)
                                 {
@@ -135,9 +153,13 @@
                     <div class="log-card-header">
                         <span class="log-level @level">@log.Level.ToDisplay()</span>
                         <span class="log-timestamp">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</span>
-                        <span class="log-source">@log.Source</span>
+                        <span class="log-source">
+                            @HighlightHelper.Highlight(log.Source, Model.SearchQuery)
+                        </span>
                     </div>
-                    <div class="log-card-message">@log.Message</div>
+                    <div class="log-card-message">
+                        @HighlightHelper.Highlight(log.Message, Model.SearchQuery)
+                    </div>
 
                     @if (hasException)
                     {

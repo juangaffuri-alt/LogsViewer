@@ -502,3 +502,145 @@
     .level-filter-item input[type="checkbox"]:checked ~ .level-name {
         opacity: 1;
     }
+.navbar-search {
+    position: relative;
+}
+
+.recent-searches-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.4rem;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    padding: 0.4rem 0;
+    z-index: 1050;
+    max-height: 320px;
+    overflow-y: auto;
+    min-width: 280px;
+}
+
+.recent-searches-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0.75rem 0.4rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6c757d;
+    border-bottom: 1px solid #f1f3f5;
+}
+
+.btn-clear-recent {
+    background: none;
+    border: none;
+    color: #0d6efd;
+    font-size: 0.7rem;
+    padding: 0;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+    .btn-clear-recent:hover {
+        text-decoration: underline;
+    }
+
+.recent-searches-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+    .recent-searches-list li a {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.45rem 0.75rem;
+        font-size: 0.85rem;
+        color: #333;
+        text-decoration: none;
+        transition: background 0.1s;
+    }
+
+        .recent-searches-list li a:hover,
+        .recent-searches-list li a.active {
+            background: #f1f3f5;
+            color: #0d6efd;
+        }
+
+        .recent-searches-list li a i {
+            color: #adb5bd;
+            font-size: 0.75rem;
+        }
+
+        .recent-searches-list li a .recent-query-text {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+.recent-searches-empty {
+    padding: 0.75rem;
+    font-size: 0.8rem;
+    color: #adb5bd;
+    text-align: center;
+}
+.landing-container {
+    max-width: 900px;
+    margin: 4rem auto;
+    padding: 0 1.5rem;
+    text-align: center;
+}
+
+.landing-hero h1 {
+    font-size: 2.5rem;
+    margin: 1rem 0 0.5rem;
+    font-weight: 700;
+}
+
+.landing-hero .lead {
+    color: #6c757d;
+    font-size: 1.1rem;
+    margin-bottom: 3rem;
+}
+
+.landing-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+
+.feature-card {
+    padding: 1.5rem;
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
+    text-align: left;
+    background: #fff;
+}
+
+    .feature-card i {
+        font-size: 1.75rem;
+        color: #0d6efd;
+        margin-bottom: 0.75rem;
+    }
+
+    .feature-card h5 {
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .feature-card p {
+        font-size: 0.9rem;
+        color: #6c757d;
+        margin: 0;
+    }
+
+.landing-cta {
+    margin-top: 2rem;
+}

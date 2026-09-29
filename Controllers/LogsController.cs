@@ -4,9 +4,11 @@ using LogsViewer.Services.Contracts;
 using System.Text;
 using LogsViewer.Services;
 using LogsViewer.Models.Filters;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LogsViewer.Controllers;
 
+[Authorize(Roles = "Desarrollo")]
 public class LogsController : Controller
 {
     private readonly ILogService _logService;
@@ -172,7 +174,7 @@ public class LogsController : Controller
         return new AdvancedSearchCriteria
         {
             Application = model.Application,
-            Query = model.SearchQuery,
+            Query = model.SearchQuery?.Trim().Trim('"').Trim(),
             Levels = model.SelectedLevels,
             StartDate = model.TimeRange.ToStartDate(),
             EndDate = null,

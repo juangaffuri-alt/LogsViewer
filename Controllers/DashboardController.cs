@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using LogsViewer.Models;
 using LogsViewer.Services.Contracts;
+using LogsViewer.Services;
+using LogsViewer.Models.Filters;
 
 namespace LogsViewer.Controllers;
 
@@ -8,23 +10,27 @@ public class DashboardController : Controller
 {
     private readonly ILogService _logService;
     private readonly ILogger<DashboardController> _logger;
+    private readonly LogFilterPreferencesService _filterService;
 
-    public DashboardController(ILogService logService, ILogger<DashboardController> logger)
+    public DashboardController(ILogService logService, ILogger<DashboardController> logger, LogFilterPreferencesService filterService)
     {
         _logService = logService;
         _logger = logger;
+        _filterService = filterService;
     }
 
-    public async Task<IActionResult> Index([FromQuery] string timeRange = "24h")
+    public async Task<IActionResult> Index()
     {
         try
         {
-            var (from, to) = ParseTimeRange(timeRange);
+            var prefs = _filterService.Get();
+            var from = prefs.TimeRange.ToStartDate();
+            var to = DateTime.UtcNow;
 
-            var stats = await _logService.GetStatisticsAsync(from, to);
+            var stats = await _logService.GetStatisticsAsync(from ?? DateTime.MinValue, to);
             var recentLogs = await _logService.GetRecentLogsAsync(20);
-            var timeSeriesData = await _logService.GetTimeSeriesDataAsync(timeRange);
-            var topErrors = await _logService.GetTopErrorsAsync(10, from, to);
+            var timeSeriesData = await _logService.GetTimeSeriesDataAsync(prefs.TimeRange.ToQueryString());
+            var topErrors = await _logService.GetTopErrorsAsync(10, from ?? DateTime.MinValue, to);
 
             var model = new DashboardViewModel
             {
@@ -46,7 +52,8 @@ public class DashboardController : Controller
     [HttpGet("api/dashboard/timeline")]
     public async Task<IActionResult> GetTimeline([FromQuery] string timeRange = "24h")
     {
-        var data = await _logService.GetTimeSeriesDataAsync(timeRange);
+        var range = TimeRangeExtensions.FromQueryString(timeRange);
+        var data = await _logService.GetTimeSeriesDataAsync(range.ToQueryString());
         return Json(new { success = true, data });
     }
 

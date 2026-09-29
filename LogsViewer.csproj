@@ -11,10 +11,12 @@
     <PackageReference Include="Piglet" Version="1.5.0" />
     <PackageReference Include="RavenDB.Client" Version="7.2.6" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Blazor-ApexCharts" Version="7.0.0" />
     <PackageReference Include="BlazorStrap" Version="5.2.104" />
     <PackageReference Include="BlazorStrap.V5" Version="5.2.104" />
+    <PackageReference Include="Bpn.Authentication.OpenIdConnect" Version="1.0.21" />
   </ItemGroup>
 
 </Project>

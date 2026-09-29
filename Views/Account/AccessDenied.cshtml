@@ -1,0 +1,14 @@
+﻿@{
+    ViewData["Title"] = "Acceso denegado";
+}
+<div class="container mt-5">
+    <div class="alert alert-danger text-center shadow">
+        <i class="fas fa-ban fa-4x mb-3"></i>
+        <h2>⛔ Acceso no autorizado</h2>
+        <p>Usted no posee los roles necesarios (<strong>Aprobador</strong> o <strong>Confirmador</strong>) para utilizar esta aplicación.</p>
+        <p>Por favor, contacte al administrador del sistema para solicitar los permisos adecuados.</p>
+        <a asp-controller="Account" asp-action="Logout" class="btn btn-primary mt-3">
+            <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+        </a>
+    </div>
+</div>

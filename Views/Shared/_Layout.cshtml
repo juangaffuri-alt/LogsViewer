@@ -1,4 +1,5 @@
-﻿@using LogsViewer.Models.Filters
+﻿@using System.Security.Claims
+@using LogsViewer.Models.Filters
 @inject LogsViewer.Services.LogFilterPreferencesService FilterService
 @{
     var prefs = FilterService.Get();
@@ -38,37 +39,117 @@
                 <span>LogsViewer</span>
             </div>
 
-            <div class="navbar-search">
-                <input type="text" class="search-input" id="global-search"
-                       placeholder="🔍 Search logs..."
-                       autocomplete="off" />
-            </div>
+            
+            @if (User.Identity?.IsAuthenticated == true && User.IsInRole("Desarrollo"))
+            {
+                <div class="navbar-search">
+                    <input type="text" class="search-input" id="global-search"
+                           placeholder="🔍 Search logs..."
+                           autocomplete="off"
+                           value="@Context.Request.Query["query"]" />
+                    <div id="recent-searches" class="recent-searches-dropdown d-none">
+                        <div class="recent-searches-header">
+                            <span>Búsquedas recientes</span>
+                            <button type="button" id="clear-recent-searches" class="btn-clear-recent">
+                                Limpiar
+                            </button>
+                        </div>
+                        <ul id="recent-searches-list" class="recent-searches-list"></ul>
+                    </div>
+                </div>
+            }
 
+            
             <div class="navbar-menu">
-                <a href="/" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Home" && ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "")">
-                    <i class="fa fa-th-large"></i> Discover
-                </a>
-                <a href="/logs" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
-                    <i class="fa fa-list"></i> Logs
-                </a>
-                <a href="/dashboard" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Dashboard" ? "active" : "")">
-                    <i class="fa fa-bar-chart"></i> Dashboard
-                </a>
-                <a href="/search" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Search" ? "active" : "")">
-                    <i class="fa fa-search"></i> Search
-                </a>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <a href="/dashboard" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Dashboard" ? "active" : "")">
+                        <i class="fa fa-bar-chart"></i> Dashboard
+                    </a>
+                    <a href="/logs" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
+                        <i class="fa fa-list"></i> Logs
+                    </a>
+                }
             </div>
 
             <div class="navbar-actions">
-                <button class="btn-icon" title="Notifications" id="btn-notifications">
-                    <i class="fa fa-bell-o"></i>
-                </button>
-                <button class="btn-icon" title="Settings" id="btn-settings">
-                    <i class="fa fa-sliders"></i>
-                </button>
-                <button class="btn-icon" title="User Menu" id="btn-user">
-                    <i class="fa fa-user-circle"></i>
-                </button>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    var givenname = User.Claims.Where(c => c.Type == ClaimTypes.GivenName).Select(c => c.Value).FirstOrDefault();
+                    var surname = User.Claims.Where(c => c.Type == ClaimTypes.Surname).Select(c => c.Value).FirstOrDefault();
+                    var iniciales = $"{givenname?.Substring(0, 1)}{surname?.Substring(0, 1)}";
+
+                    // 👇 Obtener roles del usuario (ajustá el tipo de claim si tu IdP usa otro)
+                    var roles = User.Claims
+                        .Where(c => c.Type == ClaimTypes.Role || c.Type == "role")
+                        .Select(c => c.Value)
+                        .Distinct()
+                        .OrderBy(r => r)
+                        .ToList();
+
+                    <div class="dropdown user-dropdown">
+                        <button class="btn-user-menu" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="user-avatar">@iniciales</span>
+                            <span class="user-display-name">@givenname @surname</span>
+                            <i class="fa fa-chevron-down user-caret"></i>
+                        </button>
+
+                        <ul class="dropdown-menu dropdown-menu-end user-dropdown-menu">
+                            <li class="dropdown-header">
+                                <div class="user-dropdown-header">
+                                    <div class="user-avatar-lg">@iniciales</div>
+                                    <div class="user-dropdown-info">
+                                        <div class="user-dropdown-name">@givenname @surname</div>
+                                        <div class="user-dropdown-email">@User.Identity.Name</div>
+                                    </div>
+                                </div>
+                            </li>
+
+                            <li><hr class="dropdown-divider"></li>
+
+                            <li class="dropdown-header-inline">
+                                <i class="fa fa-shield"></i> Roles asignados
+                            </li>
+
+                            @if (roles.Any())
+                            {
+                                foreach (var role in roles)
+                                {
+                                    <li>
+                                        <span class="dropdown-item role-item">
+                                            <i class="fa fa-circle role-dot"></i>
+                                            @role
+                                        </span>
+                                    </li>
+                                }
+                            }
+                            else
+                            {
+                                <li>
+                                    <span class="dropdown-item text-muted small">Sin roles asignados</span>
+                                </li>
+                            }
+
+                            <li><hr class="dropdown-divider"></li>
+
+                            <li>
+                                <form method="post" asp-controller="Account" asp-action="Logout">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item logout-item">
+                                        <i class="fa fa-sign-out"></i> Cerrar sesión
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                }
+                else
+                {
+                    <a href="/Account/Login" class="btn-login" title="Iniciar sesión">
+                        <i class="fa fa-sign-in"></i>
+                        <span>Iniciar sesión</span>
+                    </a>
+                }
             </div>
         </nav>
 
@@ -82,71 +163,90 @@
                 var activeTimeRange = Context.Request.Query["timeRange"].FirstOrDefault() ?? "24h";
                 var activeQuery = Context.Request.Query["query"].FirstOrDefault();
             }
-            <aside class="kibana-sidebar" id="kibana-sidebar">
-                <form id="sidebar-filters-form" method="post" asp-controller="Preferences" asp-action="SetFilters">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+            @if (User.Identity?.IsAuthenticated == true && User.IsInRole("Desarrollo"))
+            {
+                <aside class="kibana-sidebar" id="kibana-sidebar">
+                    <form id="sidebar-filters-form" method="post" asp-controller="Preferences" asp-action="SetFilters">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
 
-                    <!-- Rango -->
-                    <label class="form-label small text-uppercase fw-semibold text-muted">Rango</label>
-                    <select class="form-select form-select-sm mb-3" name="TimeRange"
-                            onchange="document.getElementById('sidebar-filters-form').submit()">
-                        @foreach (var range in TimeRangeExtensions.All)
-                        {
-                            <option value="@range" selected="@(range == prefs.TimeRange)">@range.ToDisplay()</option>
-                        }
-                    </select>
+                        <!-- Rango -->
+                        <div class="filter-section">
+                            <label class="filter-label">Rango</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="bi bi-clock-history"></i></span>
+                                <select class="form-select" name="TimeRange"
+                                        onchange="document.getElementById('sidebar-filters-form').submit()">
+                                    @foreach (var range in TimeRangeExtensions.All)
+                                    {
+                                        <option value="@range" selected="@(range == prefs.TimeRange)">@range.ToDisplay()</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
 
-                    <!-- Niveles -->
-                    <label class="form-label small text-uppercase fw-semibold text-muted">Niveles</label>
-                    <div class="level-filter-list">
-                        @foreach (var level in LogLevelInfo.All)
-                        {
-                            var style = LogLevelInfo.Get(level);
-                            var isChecked = prefs.Levels.Contains(level);
-                            <label class="level-filter-item" for="level-@level" style="--level-color: @style.Color">
-                                <input class="form-check-input" type="checkbox"
-                                       name="Levels" value="@level"
-                                       id="level-@level"
-                                       checked="@isChecked" />
-                                <i class="bi @style.Icon level-icon"></i>
-                                <span class="level-name">@style.DisplayName</span>
-                            </label>
-                        }
+                        <!-- Niveles -->
+                        <div class="filter-section">
+                            <label class="filter-label">Niveles</label>
+                            <div class="level-chips">
+                                @foreach (var level in LogLevelInfo.All)
+                                {
+                                    var style = LogLevelInfo.Get(level);
+                                    var isChecked = prefs.Levels.Contains(level);
+                                    <label class="level-chip" style="--level-color: @style.Color">
+                                        <input class="level-chip-input" type="checkbox"
+                                               name="Levels" value="@level"
+                                               checked="@isChecked" />
+                                        <i class="bi @style.Icon"></i>
+                                        <span>@style.DisplayName</span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Aplicación -->
+                        <div class="filter-section">
+                            <label class="filter-label">Aplicación</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="bi bi-app-indicator"></i></span>
+                                <select class="form-select" name="Application">
+                                    <option value="" selected="@(prefs.Application == null)">Todas las aplicaciones</option>
+                                    @foreach (var app in FilterService.GetApplicationsCached())
+                                    {
+                                        <option value="@app" selected="@(prefs.Application == app)">@app</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Botonera -->
+                        <div class="filter-actions">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-reset-filters"
+                                    title="Limpiar filtros">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                            </button>
+                            <button type="submit" class="btn btn-sm btn-primary flex-grow-1">
+                                <i class="bi bi-funnel-fill me-1"></i> Aplicar
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="sidebar-section">
+                        <h6 class="filter-label">Búsquedas guardadas</h6>
+                        <div class="saved-searches">
+                            <a href="/logs?query=ERROR" class="saved-search-link">
+                                <i class="bi bi-star"></i> Errores recientes
+                            </a>
+                            <a href="/logs?query=timeout" class="saved-search-link">
+                                <i class="bi bi-star"></i> Performance issues
+                            </a>
+                            <a href="/logs?query=Exception" class="saved-search-link">
+                                <i class="bi bi-star"></i> Exceptions
+                            </a>
+                        </div>
                     </div>
-
-                    <!-- Aplicación (usando el cache) -->
-                    <label class="form-label small text-uppercase fw-semibold text-muted mt-3">Aplicación</label>
-                    <select class="form-select form-select-sm mb-3" name="Application">
-                        <option value="" selected="@(prefs.Application == null)">Todas las aplicaciones</option>
-                        @foreach (var app in FilterService.GetApplicationsCached())
-                        {
-                            <option value="@app" selected="@(prefs.Application == app)">@app</option>
-                        }
-                    </select>
-
-                    <!-- Botón Aplicar -->
-                    <button type="submit" class="btn btn-primary btn-sm w-100 mt-3">
-                        <i class="bi bi-funnel-fill me-1"></i> Aplicar filtros
-                    </button>
-                </form>
-
-                <div class="sidebar-section">
-                    <h6>BÚSQUEDAS GUARDADAS</h6>
-                    <div class="saved-searches">
-                        <a href="/logs?levels=ERROR" class="saved-search-link">
-                            <i class="fa fa-star-o"></i> Errores recientes
-                        </a>
-                        <a href="/logs?query=timeout" class="saved-search-link">
-                            <i class="fa fa-star-o"></i> Performance issues
-                        </a>
-                        <a href="/logs?query=Exception" class="saved-search-link">
-                            <i class="fa fa-star-o"></i> Exceptions
-                        </a>
-                    </div>
-                </div>
-            </aside>
-
+                </aside>
+            }
             <!-- Contenido Principal -->
             <main class="kibana-content">
                 <div class="content-wrapper">
@@ -154,6 +254,7 @@
                 </div>
             </main>
         </div>
+
     </div>
 
     <!-- Modal de confirmación -->
@@ -200,7 +301,7 @@
         const currentController = '@ViewContext.RouteData.Values["controller"]';
         // Si ya estás en Search, quedate en Search; si no, andá a Search igual
         // (la idea es que este quick search siempre busque, no navegue a /logs)
-        const targetUrl = '/Search';
+        const targetUrl = '/Logs';
 
         function go() {
         const query = input.value.trim();
@@ -222,6 +323,157 @@
         });
 
         // Atajo Ctrl+K / Cmd+K
+        document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        input.focus();
+        input.select();
+        }
+        });
+        })();
+        document.getElementById('btn-reset-filters')?.addEventListener('click', () => {
+        const form = document.getElementById('sidebar-filters-form');
+        if (!form) return;
+
+        // Resetear el select de rango al default
+        form.querySelector('select[name="TimeRange"]').value = 'Last24Hours';
+
+        // Desmarcar todos los niveles excepto Info y Warning (o todos)
+        form.querySelectorAll('input[name="Levels"]').forEach(cb => {
+        cb.checked = false;
+        });
+
+        // Resetear aplicación a "todas"
+        form.querySelector('select[name="Application"]').value = '';
+
+        // Enviar el form
+        form.submit();
+        });
+        (function () {
+        const STORAGE_KEY = 'logsviewer.recent_searches';
+        const MAX_RECENT = 6;
+
+        const input = document.getElementById('global-search');
+        if (!input) return;
+
+        const dropdown = document.getElementById('recent-searches');
+        const list = document.getElementById('recent-searches-list');
+        const clearBtn = document.getElementById('clear-recent-searches');
+
+        // ---------- Storage ----------
+        function getRecent() {
+        try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        } catch {
+        return [];
+        }
+        }
+
+        function saveRecent(query) {
+        if (!query) return;
+        let recents = getRecent().filter(q => q !== query);
+        recents.unshift(query);
+        recents = recents.slice(0, MAX_RECENT);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(recents));
+        }
+
+        function clearRecent() {
+        localStorage.removeItem(STORAGE_KEY);
+        }
+
+        // ---------- Render ----------
+        function render() {
+        const recents = getRecent();
+
+        if (recents.length === 0) {
+        list.innerHTML = '<li class="recent-searches-empty">Todavía no hiciste búsquedas</li>';
+        dropdown.classList.remove('d-none');
+        return;
+        }
+
+        list.innerHTML = recents.map(q => `
+        <li>
+        <a href="/Logs?query=${encodeURIComponent(q)}" data-query="${q.replace(/"/g, '&quot;')}">
+        <i class="bi bi-clock-history"></i>
+        <span class="recent-query-text">${escapeHtml(q)}</span>
+        </a>
+        </li>
+        `).join('');
+
+        dropdown.classList.remove('d-none');
+        }
+
+        function escapeHtml(s) {
+        return s.replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[c]);
+        }
+
+        // ---------- Interacción ----------
+        input.addEventListener('focus', render);
+        input.addEventListener('click', render);
+
+        input.addEventListener('blur', () => {
+        // Delay para permitir el click en una sugerencia
+        setTimeout(() => dropdown.classList.add('d-none'), 150);
+        });
+
+        // Navegación con flechas dentro del dropdown
+        input.addEventListener('keydown', (e) => {
+        const items = dropdown.querySelectorAll('.recent-searches-list li a');
+        const current = dropdown.querySelector('.recent-searches-list li a.active');
+
+        if (e.key === 'ArrowDown' && items.length) {
+        e.preventDefault();
+        if (!current) items[0].classList.add('active');
+        else {
+        current.classList.remove('active');
+        const i = Array.from(items).indexOf(current);
+        items[(i + 1) % items.length].classList.add('active');
+        }
+        }
+
+        if (e.key === 'ArrowUp' && items.length) {
+        e.preventDefault();
+        if (!current) items[items.length - 1].classList.add('active');
+        else {
+        current.classList.remove('active');
+        const i = Array.from(items).indexOf(current);
+        items[(i - 1 + items.length) % items.length].classList.add('active');
+        }
+        }
+
+        if (e.key === 'Enter') {
+        e.preventDefault();
+        if (current) {
+        window.location.href = current.getAttribute('href');
+        } else if (input.value.trim()) {
+        saveRecent(input.value.trim());
+        window.location.href = `/Logs?query=${encodeURIComponent(input.value.trim())}`;
+        }
+        }
+
+        if (e.key === 'Escape') {
+        input.value = '';
+        input.blur();
+        }
+        });
+
+        // Click en una sugerencia
+        list.addEventListener('click', (e) => {
+        const link = e.target.closest('a');
+        if (!link) return;
+        saveRecent(link.dataset.query);
+        });
+
+        // Limpiar
+        clearBtn?.addEventListener('click', (e) => {
+        e.preventDefault();
+        clearRecent();
+        render();
+        });
+
+        // Ctrl+K / Cmd+K
         document.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();

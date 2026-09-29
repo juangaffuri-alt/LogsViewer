@@ -83,7 +83,10 @@
             {
                 <div class="log-card">
                     <div class="log-header">
-                        <span class="log-level @log.Level.ToString().ToLower()">@log.Level</span>
+                        @{
+                            var style = LogLevelInfo.Get(log.Level);
+                        }
+                        <span class="log-level @log.Level.ToQueryString().ToLower()">@log.Level.ToDisplay()</span>
                         <span class="log-timestamp">@log.Timestamp.ToString("HH:mm:ss")</span>
                         <span class="log-source">@log.Source</span>
                     </div>
