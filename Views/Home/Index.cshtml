@@ -75,7 +75,7 @@
                 {
                     <div class="log-card">
                         <div class="log-header">
-                            <span class="log-level @log.Level.ToLower()">
+                            <span class="log-level @log.Level.ToString().ToLower()">
                                 @log.Level
                             </span>
                             <span class="log-timestamp">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</span>

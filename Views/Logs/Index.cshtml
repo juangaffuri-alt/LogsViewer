@@ -59,13 +59,13 @@
                     @for (int i = 0; i < Model.Logs.Count; i++)
                     {
                         var log = Model.Logs[i];
-                        var level = (log.Level ?? "info").ToLower();
+                        var level = log.Level.ToQueryString().ToLower(); // o log.Level.ToString().ToLower()
                         var propsId = $"props-{i}";
                         var hasProps = log.Properties != null && log.Properties.Any();
                         var hasException = !string.IsNullOrWhiteSpace(log.Exception);
 
                         <tr class="log-row level-@level">
-                            <td><span class="log-level @level">@log.Level</span></td>
+                            <td><span class="log-level @level">@log.Level.ToDisplay()</span></td>
                             <td class="log-timestamp">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</td>
                             <td class="log-app">@log.Application</td>
                             <td class="log-source">@log.Source</td>
@@ -127,13 +127,13 @@
         <div id="logs-card" class="logs-card" hidden>
             @foreach (var log in Model.Logs)
             {
-                var level = (log.Level ?? "info").ToLower();
+                var level = log.Level.ToQueryString().ToLower(); // o log.Level.ToString().ToLower()
                 var hasProps = log.Properties != null && log.Properties.Any();
                 var hasException = !string.IsNullOrWhiteSpace(log.Exception);
 
                 <div class="log-card level-@level">
                     <div class="log-card-header">
-                        <span class="log-level @level">@log.Level</span>
+                        <span class="log-level @level">@log.Level.ToDisplay()</span>
                         <span class="log-timestamp">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</span>
                         <span class="log-source">@log.Source</span>
                     </div>

@@ -6,7 +6,7 @@
 
         public DateTime Timestamp { get; set; }
 
-        public string Level { get; set; } = string.Empty; // ERROR, WARNING, INFO, DEBUG
+        public LogsViewer.Models.Filters.LogLevel Level { get; set; }
 
         public string Message { get; set; } = string.Empty;
 

@@ -1,4 +1,5 @@
 ﻿using LogsViewer.Models;
+using LogsViewer.Models.Filters;
 
 namespace LogsViewer.Services.Contracts
 {

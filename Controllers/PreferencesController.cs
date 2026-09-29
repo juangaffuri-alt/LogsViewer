@@ -1,5 +1,4 @@
-﻿// Controllers/PreferencesController.cs
-using LogsViewer.Models;
+﻿using LogsViewer.Models.Filters;
 using LogsViewer.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,9 +16,8 @@ public class PreferencesController : Controller
     public IActionResult SetFilters(LogFilterPreferences prefs, string? returnUrl)
     {
         if (prefs.Levels == null || prefs.Levels.Count == 0)
-            prefs.Levels = new List<string> { "VERBOSE", "DEBUG", "INFO", "WARNING", "ERROR", "FATAL" };
+            prefs.Levels = LogLevelExtensions.All.ToHashSet();
 
-        // El <select> manda "" cuando es "Todas"
         if (string.IsNullOrWhiteSpace(prefs.Application))
             prefs.Application = null;
 

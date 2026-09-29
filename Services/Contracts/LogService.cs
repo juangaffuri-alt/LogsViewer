@@ -1,9 +1,10 @@
 ﻿using LogsViewer.Models;
+using LogsViewer.Models.Filters;
 using LogsViewer.Services.Contracts;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Linq;
 using Raven.Client.Documents.Session;
-using LogLevel = LogsViewer.Models.LogLevel;
+using LogLevel = LogsViewer.Models.Filters.LogLevel;
 
 namespace LogsViewer.Services.Implementation;
 
@@ -124,11 +125,11 @@ public class LogService : ILogService
         return new LogStatisticsViewModel
         {
             TotalLogs = logs.Count,
-            ErrorCount = logs.Count(x => x.Level == "ERROR"),
-            WarningCount = logs.Count(x => x.Level == "WARNING"),
-            InfoCount = logs.Count(x => x.Level == "INFO"),
-            DebugCount = logs.Count(x => x.Level == "DEBUG"),
-            TraceCount = logs.Count(x => x.Level == "TRACE"),
+            ErrorCount = logs.Count(x => x.Level == LogLevel.Error),
+            WarningCount = logs.Count(x => x.Level == LogLevel.Warning),
+            InfoCount = logs.Count(x => x.Level == LogLevel.Information),
+            DebugCount = logs.Count(x => x.Level == LogLevel.Debug),
+            TraceCount = logs.Count(x => x.Level == LogLevel.Verbose),
             LogsBySource = logs.GroupBy(x => x.Source).ToDictionary(g => g.Key, g => g.Count()),
             LogsByHour = logs
                 .GroupBy(x => x.Timestamp.ToString("yyyy-MM-dd HH:00"))
@@ -195,10 +196,10 @@ public class LogService : ILogService
             return new TimeSeriesDataViewModel
             {
                 Timestamps = bucketKeys,
-                ErrorCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == "ERROR") : 0).ToList(),
-                WarningCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == "WARNING") : 0).ToList(),
-                InfoCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == "INFO") : 0).ToList(),
-                DebugCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == "DEBUG") : 0).ToList()
+                ErrorCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == LogLevel.Error) : 0).ToList(),
+                WarningCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == LogLevel.Warning) : 0).ToList(),
+                InfoCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == LogLevel.Information) : 0).ToList(),
+                DebugCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == LogLevel.Debug) : 0).ToList()
             };
         }
         catch (Exception ex)
@@ -231,7 +232,7 @@ public class LogService : ILogService
 
             return entities
                 .Select(e => MapToViewModel(e, session))
-                .Where(x => string.Equals(x.Level, level, StringComparison.OrdinalIgnoreCase))
+                .Where(x => string.Equals(x.Level.ToString(), level, StringComparison.OrdinalIgnoreCase))
                 .Take(limit)
                 .ToList();
         }
@@ -310,7 +311,7 @@ public class LogService : ILogService
             Application = GetProp("Application") ?? "Unknown",
             SourceContext = GetProp("SourceContext") ?? "",
             Timestamp = entity.Timestamp.LocalDateTime,
-            Level = MapLevelBucket(entity.LevelNumeric),
+            Level = LogLevelExtensions.FromQueryString(GetProp("Level")),
             Message = entity.Message,
             Source = source,
             Exception = entity.Exception,
@@ -393,7 +394,12 @@ public class LogService : ILogService
         }
 
         if (criteria.Levels.Any())
-            logs = logs.Where(x => criteria.Levels.Contains(x.Level));
+        {
+            // criteria.Levels es List<LogLevel>; x.Level en el ViewModel sigue siendo string.
+            // Comparamos usando la extensión ToQueryString para que "informational" no rompa.
+            var levelStrings = criteria.Levels.Select(l => l.ToQueryString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            logs = logs.Where(x => levelStrings.Contains(x.Level.ToString()));
+        }
 
         if (criteria.Sources.Any())
             logs = logs.Where(x => criteria.Sources.Contains(x.Source));

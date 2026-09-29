@@ -1,7 +1,10 @@
 ﻿// Services/LogFilterPreferencesService.cs
 using LogsViewer.Models;
+using LogsViewer.Models.Filters;
 using LogsViewer.Services.Contracts;
+using Newtonsoft.Json.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace LogsViewer.Services;
 
@@ -16,6 +19,11 @@ public class LogFilterPreferencesService
     private static DateTime _cacheExpiry = DateTime.MinValue;
     private static readonly SemaphoreSlim _refreshLock = new(1, 1);
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     private static bool _isWarmedUp = false;
 
@@ -35,8 +43,9 @@ public class LogFilterPreferencesService
 
         try
         {
-            return JsonSerializer.Deserialize<LogFilterPreferences>(raw)
-                   ?? new LogFilterPreferences();
+            var prefs = JsonSerializer.Deserialize<LogFilterPreferences>(raw, JsonOptions);
+            
+            return prefs ?? new LogFilterPreferences();
         }
         catch
         {
@@ -46,7 +55,8 @@ public class LogFilterPreferencesService
 
     public void Set(LogFilterPreferences prefs)
     {
-        var json = JsonSerializer.Serialize(prefs);
+        
+        var json = JsonSerializer.Serialize(prefs, JsonOptions);
         _httpContextAccessor.HttpContext?.Response.Cookies.Append(
             CookieName,
             json,

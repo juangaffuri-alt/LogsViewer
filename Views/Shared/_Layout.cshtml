@@ -1,9 +1,7 @@
-﻿@inject LogsViewer.Services.LogFilterPreferencesService FilterService
+﻿@using LogsViewer.Models.Filters
+@inject LogsViewer.Services.LogFilterPreferencesService FilterService
 @{
-    ViewData["Title"] = ViewData["Title"] ?? "Logger Portal - Logs Visualization";
     var prefs = FilterService.Get();
-    var apps = FilterService.GetApplicationsCached();
-    var allLevels = new[] { "VERBOSE", "DEBUG", "INFO", "WARNING", "ERROR", "FATAL" };
 }
 
 <!DOCTYPE html>
@@ -89,15 +87,14 @@
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
 
-                    <!-- Rango de tiempo -->
-                    <label class="form-label small">Rango</label>
-                    <select class="form-control form-control-sm" name="TimeRange" onchange="this.form.submit()">
-                        <option value="1h" selected="@(prefs.TimeRange == "1h")">Última hora</option>
-                        <option value="24h" selected="@(prefs.TimeRange == "24h")">Últimas 24 horas</option>
-                        <option value="7d" selected="@(prefs.TimeRange == "7d")">Últimos 7 días</option>
-                        <option value="30d" selected="@(prefs.TimeRange == "30d")">Últimos 30 días</option>
-                        <option value="90d" selected="@(prefs.TimeRange == "90d")">Últimos 90 días</option>
-                        <option value="all" selected="@(prefs.TimeRange == "all")">Todo</option>
+                    <!-- Rango -->
+                    <label class="form-label small text-uppercase fw-semibold text-muted">Rango</label>
+                    <select class="form-select form-select-sm mb-3" name="TimeRange"
+                            onchange="document.getElementById('sidebar-filters-form').submit()">
+                        @foreach (var range in TimeRangeExtensions.All)
+                        {
+                            <option value="@range" selected="@(range == prefs.TimeRange)">@range.ToDisplay()</option>
+                        }
                     </select>
 
                     <!-- Niveles -->
@@ -107,8 +104,7 @@
                         {
                             var style = LogLevelInfo.Get(level);
                             var isChecked = prefs.Levels.Contains(level);
-                            <label class="level-filter-item" for="level-@level"
-                                   style="--level-color: @style.Color">
+                            <label class="level-filter-item" for="level-@level" style="--level-color: @style.Color">
                                 <input class="form-check-input" type="checkbox"
                                        name="Levels" value="@level"
                                        id="level-@level"
@@ -118,16 +114,19 @@
                             </label>
                         }
                     </div>
-                    <!-- Aplicación -->
+
+                    <!-- Aplicación (usando el cache) -->
+                    <label class="form-label small text-uppercase fw-semibold text-muted mt-3">Aplicación</label>
                     <select class="form-select form-select-sm mb-3" name="Application">
                         <option value="" selected="@(prefs.Application == null)">Todas las aplicaciones</option>
-                        @foreach (var app in apps)
+                        @foreach (var app in FilterService.GetApplicationsCached())
                         {
                             <option value="@app" selected="@(prefs.Application == app)">@app</option>
                         }
                     </select>
+
                     <!-- Botón Aplicar -->
-                    <button type="submit" class="btn btn-primary btn-sm w-100 mt-6">
+                    <button type="submit" class="btn btn-primary btn-sm w-100 mt-3">
                         <i class="bi bi-funnel-fill me-1"></i> Aplicar filtros
                     </button>
                 </form>

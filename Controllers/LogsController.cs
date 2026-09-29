@@ -3,6 +3,7 @@ using LogsViewer.Models;
 using LogsViewer.Services.Contracts;
 using System.Text;
 using LogsViewer.Services;
+using LogsViewer.Models.Filters;
 
 namespace LogsViewer.Controllers;
 
@@ -36,10 +37,10 @@ public class LogsController : Controller
             CurrentPage = page < 1 ? 1 : page,
             PageSize = pageSize <= 0 ? 50 : pageSize,
             SearchQuery = query,
-            TimeRange = prefs.TimeRange,
-            SelectedLevels = prefs.Levels,
-            Application = prefs.Application,                                   // 👈 nuevo
-            AvailableApplications = await _logService.GetDistinctApplicationsAsync()  // 👈 nuevo
+            TimeRange = prefs.TimeRange,          // ya es TimeRange
+            SelectedLevels = prefs.Levels.ToList(), // HashSet → List
+            Application = prefs.Application,
+            AvailableApplications = await _logService.GetDistinctApplicationsAsync()
         };
 
         try
@@ -75,7 +76,7 @@ public class LogsController : Controller
                 PageSize = pageSize,
                 SearchQuery = query,
                 TimeRange = prefs.TimeRange,
-                SelectedLevels = prefs.Levels
+                SelectedLevels = prefs.Levels.ToList()
             };
             var criteria = BuildCriteria(tempModel);
 
@@ -148,7 +149,7 @@ public class LogsController : Controller
                 PageSize = 10000, // Limitar exportación
                 SearchQuery = request.Query,
                 TimeRange = request.TimeRange,
-                SelectedLevels = request.Levels?.ToList() ?? new()
+                SelectedLevels = request.Levels?.Select(l => Enum.Parse<Models.Filters.LogLevel>(l, true)).ToList() ?? new()
             };
             var criteria = BuildCriteria(model);
 
@@ -166,15 +167,19 @@ public class LogsController : Controller
         }
     }
 
-    private static AdvancedSearchCriteria BuildCriteria(LogsPageViewModel model) => new()
+    private AdvancedSearchCriteria BuildCriteria(LogsPageViewModel model)
     {
-        Query = model.SearchQuery,
-        Levels = model.SelectedLevels,
-        StartDate = GetStartDateFromTimeRange(model.TimeRange),
-        Page = model.CurrentPage,
-        PageSize = model.PageSize,
-        Application = model.Application,  // 👈 nuevo
-    };
+        return new AdvancedSearchCriteria
+        {
+            Application = model.Application,
+            Query = model.SearchQuery,
+            Levels = model.SelectedLevels,
+            StartDate = model.TimeRange.ToStartDate(),
+            EndDate = null,
+            Page = model.CurrentPage,
+            PageSize = model.PageSize
+        };
+    }
 
     private static DateTime? GetStartDateFromTimeRange(string timeRange) => timeRange switch
     {
@@ -195,7 +200,7 @@ public class LogsController : Controller
         {
             sb.AppendLine(string.Join(",",
                 EscapeCsvField(log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")),
-                EscapeCsvField(log.Level),
+                EscapeCsvField(log.Level.ToString()),
                 EscapeCsvField(log.Source),
                 EscapeCsvField(log.Message)));
         }
@@ -219,5 +224,5 @@ public class ExportLogsRequest
 {
     public string? Query { get; set; }
     public string[]? Levels { get; set; }
-    public string TimeRange { get; set; } = "24h";
+    public TimeRange TimeRange { get; set; } = TimeRange.All;
 }
