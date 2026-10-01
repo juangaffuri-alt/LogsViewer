@@ -69,6 +69,9 @@
                     <a href="/logs" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
                         <i class="fa fa-list"></i> Logs
                     </a>
+                    <a href="/apikeys" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "ApiKeys" ? "active" : "")">
+                        <i class="fa fa-key"></i> API Keys
+                    </a>
                 }
             </div>
 

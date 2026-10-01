@@ -18,7 +18,7 @@ namespace LogsViewer.Services.Contracts
         /// <summary>
         /// Obtiene los logs más recientes
         /// </summary>
-        Task<List<LogViewModel>> GetRecentLogsAsync(int count = 10);
+        Task<List<LogViewModel>> GetRecentLogsAsync(int count, AdvancedSearchCriteria criteria);
 
         /// <summary>
         /// Busca logs por query string
@@ -28,17 +28,17 @@ namespace LogsViewer.Services.Contracts
         /// <summary>
         /// Obtiene estadísticas de logs
         /// </summary>
-        Task<LogStatisticsViewModel> GetStatisticsAsync(DateTime? from = null, DateTime? to = null);
-        
+        Task<LogStatisticsViewModel> GetStatisticsAsync(AdvancedSearchCriteria criteria);
+
         /// <summary>
         /// Obtiene datos de línea de tiempo para gráficos
         /// </summary>
-        Task<TimeSeriesDataViewModel> GetTimeSeriesDataAsync(string timeRange = "24h");
+        Task<TimeSeriesDataViewModel> GetTimeSeriesDataAsync(AdvancedSearchCriteria criteria);
 
         /// <summary>
         /// Obtiene los errores más frecuentes
         /// </summary>
-        Task<List<TopErrorViewModel>> GetTopErrorsAsync(int limit = 10, DateTime? from = null, DateTime? to = null);
+        Task<List<TopErrorViewModel>> GetTopErrorsAsync(int limit, AdvancedSearchCriteria criteria);
         /// <summary>
         /// Filtra logs por nivel
         /// </summary>

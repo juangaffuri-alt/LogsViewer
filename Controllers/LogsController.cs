@@ -109,7 +109,17 @@ public class LogsController : Controller
     {
         try
         {
-            var logs = await _logService.GetRecentLogsAsync(count);
+            var prefs = _filterService.Get();
+
+            var criteria = new AdvancedSearchCriteria
+            {
+                Application = prefs.Application,
+                Levels = prefs.Levels.ToList(),
+                StartDate = prefs.TimeRange.ToStartDate(),
+                EndDate = DateTime.UtcNow
+            };
+
+            var logs = await _logService.GetRecentLogsAsync(count, criteria);
             return Json(new { success = true, logs });
         }
         catch (Exception ex)
@@ -127,7 +137,17 @@ public class LogsController : Controller
     {
         try
         {
-            var stats = await _logService.GetStatisticsAsync();
+            var prefs = _filterService.Get();
+
+            var criteria = new AdvancedSearchCriteria
+            {
+                Application = prefs.Application,
+                Levels = prefs.Levels.ToList(),
+                StartDate = prefs.TimeRange.ToStartDate(),
+                EndDate = DateTime.UtcNow
+            };
+
+            var stats = await _logService.GetStatisticsAsync(criteria);
             return Json(new { success = true, stats });
         }
         catch (Exception ex)

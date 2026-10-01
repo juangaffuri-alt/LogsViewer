@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using LogsViewer.Models;
-using LogsViewer.Services.Contracts;
-using LogsViewer.Services;
 using LogsViewer.Models.Filters;
+using LogsViewer.Services;
+using LogsViewer.Services.Contracts;
 
 namespace LogsViewer.Controllers;
 
@@ -12,7 +12,10 @@ public class DashboardController : Controller
     private readonly ILogger<DashboardController> _logger;
     private readonly LogFilterPreferencesService _filterService;
 
-    public DashboardController(ILogService logService, ILogger<DashboardController> logger, LogFilterPreferencesService filterService)
+    public DashboardController(
+        ILogService logService,
+        ILogger<DashboardController> logger,
+        LogFilterPreferencesService filterService)
     {
         _logService = logService;
         _logger = logger;
@@ -24,20 +27,27 @@ public class DashboardController : Controller
         try
         {
             var prefs = _filterService.Get();
-            var from = prefs.TimeRange.ToStartDate();
-            var to = DateTime.UtcNow;
 
-            var stats = await _logService.GetStatisticsAsync(from ?? DateTime.MinValue, to);
-            var recentLogs = await _logService.GetRecentLogsAsync(20);
-            var timeSeriesData = await _logService.GetTimeSeriesDataAsync(prefs.TimeRange.ToQueryString());
-            var topErrors = await _logService.GetTopErrorsAsync(10, from ?? DateTime.MinValue, to);
+            var criteria = new AdvancedSearchCriteria
+            {
+                Application = prefs.Application,
+                Levels = prefs.Levels.ToList(),
+                StartDate = prefs.TimeRange.ToStartDate(),
+                EndDate = DateTime.UtcNow
+            };
+
+            var stats = await _logService.GetStatisticsAsync(criteria);
+            var recentLogs = await _logService.GetRecentLogsAsync(20, criteria);
+            var timeSeriesData = await _logService.GetTimeSeriesDataAsync(criteria);
+            var topErrors = await _logService.GetTopErrorsAsync(10, criteria);
 
             var model = new DashboardViewModel
             {
                 Statistics = stats,
                 RecentLogs = recentLogs,
                 TimeSeriesData = timeSeriesData,
-                TopErrors = topErrors
+                TopErrors = topErrors,
+                CurrentTimeRange = prefs.TimeRange
             };
 
             return View(model);
@@ -50,33 +60,34 @@ public class DashboardController : Controller
     }
 
     [HttpGet("api/dashboard/timeline")]
-    public async Task<IActionResult> GetTimeline([FromQuery] string timeRange = "24h")
+    public async Task<IActionResult> GetTimeline()
     {
-        var range = TimeRangeExtensions.FromQueryString(timeRange);
-        var data = await _logService.GetTimeSeriesDataAsync(range.ToQueryString());
+        var prefs = _filterService.Get();
+        var criteria = new AdvancedSearchCriteria
+        {
+            Application = prefs.Application,
+            Levels = prefs.Levels.ToList(),
+            StartDate = prefs.TimeRange.ToStartDate(),
+            EndDate = DateTime.UtcNow
+        };
+
+        var data = await _logService.GetTimeSeriesDataAsync(criteria);
         return Json(new { success = true, data });
     }
 
     [HttpGet("api/dashboard/top-errors")]
-    public async Task<IActionResult> GetTopErrors([FromQuery] int limit = 10, [FromQuery] string timeRange = "24h")
+    public async Task<IActionResult> GetTopErrors([FromQuery] int limit = 10)
     {
-        var (from, to) = ParseTimeRange(timeRange);
-        var errors = await _logService.GetTopErrorsAsync(limit, from, to);
-        return Json(new { success = true, errors });
-    }
-
-    private static (DateTime from, DateTime to) ParseTimeRange(string timeRange)
-    {
-        var to = DateTime.UtcNow;
-        var from = timeRange switch
+        var prefs = _filterService.Get();
+        var criteria = new AdvancedSearchCriteria
         {
-            "15m" => to.AddMinutes(-15),
-            "1h" => to.AddHours(-1),
-            "24h" => to.AddHours(-24),
-            "7d" => to.AddDays(-7),
-            "30d" => to.AddDays(-30),
-            _ => to.AddHours(-24)
+            Application = prefs.Application,
+            Levels = prefs.Levels.ToList(),
+            StartDate = prefs.TimeRange.ToStartDate(),
+            EndDate = DateTime.UtcNow
         };
-        return (from, to);
+
+        var errors = await _logService.GetTopErrorsAsync(limit, criteria);
+        return Json(new { success = true, errors });
     }
 }

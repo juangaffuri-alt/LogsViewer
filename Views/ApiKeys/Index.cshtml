@@ -1,0 +1,164 @@
+﻿@using LogsViewer.Services.Contracts
+@model LogsViewer.Models.ApiKeysPageViewModel
+@{
+    var settings = Model.Settings;
+}
+
+<div class="api-keys-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1><i class="fa fa-key"></i> API Keys</h1>
+            <p class="text-muted mb-0">
+                Las API keys se usan en el header <code>X-Seq-ApiKey</code> para autenticar la api.
+            </p>
+        </div>
+    </div>
+
+    @if (TempData["Message"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["Message"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Settings -->
+    <div class="api-key-settings-card">
+        <div>
+            <h5>Estado de las API keys</h5>
+            @if (settings.IsEnabled)
+            {
+                <p class="text-muted mb-0">
+                    <span class="badge bg-success me-1">Habilitadas</span>
+                    Los requests <strong>requieren</strong> el header <code>X-Seq-ApiKey</code>.
+                </p>
+            }
+            else
+            {
+                <p class="text-muted mb-0">
+                    <span class="badge bg-secondary me-1">Deshabilitadas</span>
+                    Se aceptan <strong>TODOS</strong> los requests (modo abierto).
+                </p>
+            }
+        </div>
+        <form method="post" asp-action="Toggle">
+            @Html.AntiForgeryToken()
+            @if (settings.IsEnabled)
+            {
+                <button type="submit" name="enable" value="false" class="btn btn-sm btn-outline-danger">
+                    <i class="fa fa-times"></i> Deshabilitar
+                </button>
+            }
+            else if (Model.Keys.Any())
+            {
+                <button type="submit" name="enable" value="true" class="btn btn-sm btn-outline-primary">
+                    <i class="fa fa-check"></i> Habilitar
+                </button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled
+                        title="Creá al menos una API key primero">
+                    <i class="fa fa-check"></i> Habilitar
+                </button>
+            }
+        </form>
+        @if (!settings.IsEnabled && !Model.Keys.Any())
+        {
+            <div class="text-muted small mt-2">
+                <i class="fa fa-info-circle"></i>
+                Creá al menos una API key antes de habilitar la verificación.
+            </div>
+        }
+    </div>
+
+    <!-- Tabla -->
+    <h5 class="mt-4">Keys</h5>
+    <table class="table align-middle api-keys-table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Key</th>
+                <th>Creada</th>
+                <th class="text-end">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model == null || !Model.Keys.Any())
+            {
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">
+                        No hay API keys creadas todavía.
+                    </td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var k in Model.Keys)
+                {
+                    <tr>
+                        <td><strong>@k.Name</strong></td>
+                        <td><code class="api-key-cell">@k.Key</code></td>
+                        <td class="text-muted small">@k.Created.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-copy-key"
+                                    data-key="@k.Key" title="Copiar">
+                                <i class="fa fa-copy"></i>
+                            </button>
+                            <form method="post" asp-action="Delete" asp-route-id="@k.Id" class="d-inline"
+                                  onsubmit="return confirm('¿Eliminar la API key @k.Name? Esta acción no se puede deshacer.');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+
+    <!-- Crear -->
+    <h5 class="mt-4">Crear nueva</h5>
+    <form method="post" asp-action="Create" class="row g-2 align-items-center">
+        @Html.AntiForgeryToken()
+        <div class="col-md-4">
+            <input type="text" name="name" class="form-control"
+                   placeholder="Nombre (obligatorio)" required autocomplete="off" />
+        </div>
+        <div class="col-md-6">
+            <input type="text" name="key" class="form-control"
+                   placeholder="Key (vacío = generar automáticamente)" autocomplete="off" />
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-success w-100">
+                <i class="fa fa-save"></i> Guardar
+            </button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.btn-copy-key').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                await navigator.clipboard.writeText(btn.dataset.key);
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fa fa-check"></i>';
+                btn.classList.replace('btn-outline-secondary', 'btn-success');
+                setTimeout(() => {
+                    btn.innerHTML = orig;
+                    btn.classList.replace('btn-success', 'btn-outline-secondary');
+                }, 1500);
+            });
+        });
+    </script>
+}

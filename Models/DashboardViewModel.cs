@@ -1,4 +1,6 @@
-﻿namespace LogsViewer.Models;
+﻿using LogsViewer.Models.Filters;
+
+namespace LogsViewer.Models;
 
 public class DashboardViewModel
 {
@@ -11,4 +13,5 @@ public class DashboardViewModel
     public List<TopErrorViewModel> TopErrors { get; set; } = new();
 
     public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
+    public TimeRange CurrentTimeRange { get; set; } = TimeRange.Last24Hours;
 }

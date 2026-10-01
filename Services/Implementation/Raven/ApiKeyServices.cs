@@ -104,17 +104,19 @@ public class ApiKeyServices : IApiKeyServices
         this.logger.LogTrace("Entering to GetSettings");
 
         using var session = this.documentStore.OpenAsyncSession();
-        ApiKeySettingsModel? apiKeySettings = await session.Query<ApiKeySettingsModel>()
-            .FirstOrDefaultAsync(cancellationToken);
+        // 👇 LoadAsync por ID fijo: lee directo, sin pasar por índice, sin staleness
+        ApiKeySettingsModel? apiKeySettings = await session.LoadAsync<ApiKeySettingsModel>(
+            ApiKeySettingsModel.SingletonId, cancellationToken);
 
         if (apiKeySettings == null)
-        {
             return new ApiKeySettings(false);
-        }
-        else
-        {
-            return new ApiKeySettings(apiKeySettings.IsEnabled);
-        }
+
+        this.logger.LogWarning("DEBUG GetSettings: doc={Found} id={Id} IsEnabled={IsEnabled}",
+    apiKeySettings != null,
+    apiKeySettings?.Id ?? "null",
+    apiKeySettings?.IsEnabled);
+
+        return new ApiKeySettings(apiKeySettings.IsEnabled);
     }
 
     public async Task StoreSettings(ApiKeySettings settings, CancellationToken cancellationToken)
@@ -122,26 +124,26 @@ public class ApiKeyServices : IApiKeyServices
         this.logger.LogTrace("Entering to StoreSettings with {IsEnabled}.", settings.IsEnabled);
 
         using var session = this.documentStore.OpenAsyncSession();
-        ApiKeySettingsModel? apiKeySettings = await session.Query<ApiKeySettingsModel>()
-            .FirstOrDefaultAsync(cancellationToken);
+        // 👇 Cargamos por ID fijo (siempre el mismo doc)
+        ApiKeySettingsModel? apiKeySettings = await session.LoadAsync<ApiKeySettingsModel>(
+            ApiKeySettingsModel.SingletonId, cancellationToken);
 
         if (apiKeySettings == null)
         {
-            apiKeySettings = new ApiKeySettingsModel()
+            apiKeySettings = new ApiKeySettingsModel
             {
-                Metadata = new UserObjectMetadata()
+                Metadata = new UserObjectMetadata
                 {
                     Created = DateTime.UtcNow,
                     CreatedBy = "System",
                     CreatedById = "System"
                 }
             };
-
-            await session.StoreAsync(apiKeySettings, cancellationToken);
+            // 👇 Store con ID explícito: garantiza que sea singleton
+            await session.StoreAsync(apiKeySettings, ApiKeySettingsModel.SingletonId, cancellationToken);
         }
 
         apiKeySettings.IsEnabled = settings.IsEnabled;
-
         await session.SaveChangesAsync(cancellationToken);
 
         this.logger.LogInformation("Save Api key settings (IsEnabled={ApiKeyIsEnabled}).", settings.IsEnabled);

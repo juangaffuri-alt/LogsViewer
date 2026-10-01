@@ -62,23 +62,13 @@ public class LogService : ILogService
         }
     }
 
-    public async Task<List<LogViewModel>> GetRecentLogsAsync(int count = 10)
+    public async Task<List<LogViewModel>> GetRecentLogsAsync(int count, AdvancedSearchCriteria criteria)
     {
-        try
-        {
-            using var session = _documentStore.OpenAsyncSession();
-            var entities = await session.Query<LogEntity>()
-                .OrderByDescending(x => x.Timestamp)
-                .Take(count)
-                .ToListAsync();
+        criteria.Page = 1;
+        criteria.PageSize = count;
 
-            return entities.Select(e => MapToViewModel(e, session)).ToList();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting recent logs");
-            return new List<LogViewModel>();
-        }
+        var logs = await GetFilteredLogsAsync(criteria);
+        return logs.ToList(); // GetFilteredLogsAsync ya ordena por Timestamp descendente
     }
 
     public async Task<List<LogViewModel>> SearchLogsAsync(string query)
@@ -106,107 +96,88 @@ public class LogService : ILogService
         }
     }
 
-    public async Task<LogStatisticsViewModel> GetStatisticsAsync(DateTime? from = null, DateTime? to = null)
+    public async Task<LogStatisticsViewModel> GetStatisticsAsync(AdvancedSearchCriteria criteria)
     {
-        using var session = _documentStore.OpenAsyncSession();
-        var query = session.Query<LogEntity>();
+        // Traemos un batch grande sin paginar para calcular stats
+        criteria.Page = 1;
+        criteria.PageSize = int.MaxValue;
 
-        if (from.HasValue) query = query.Where(x => x.Timestamp >= from);
-        if (to.HasValue) query = query.Where(x => x.Timestamp <= to);
+        var logs = await GetFilteredLogsAsync(criteria);
+        var total = logs.Count;
 
-        var entities = await query
-            .OrderByDescending(x => x.Timestamp)
-            .Take(WorkingSetSize)
-            .ToListAsync();
+        var errorCount = logs.Count(l => l.Level == LogLevel.Error || l.Level == LogLevel.Fatal);
+        var warningCount = logs.Count(l => l.Level == LogLevel.Warning);
+        var infoCount = logs.Count(l => l.Level == LogLevel.Information);
+        var debugCount = logs.Count(l => l.Level == LogLevel.Debug);
+        var traceCount = logs.Count(l => l.Level == LogLevel.Verbose);
 
-        var logs = entities.Select(e => MapToViewModel(e, session)).ToList();
-
-        var total = logs.Count == 0 ? 1 : logs.Count; // evitar div/0
         return new LogStatisticsViewModel
         {
-            TotalLogs = logs.Count,
-            ErrorCount = logs.Count(x => x.Level == LogLevel.Error),
-            WarningCount = logs.Count(x => x.Level == LogLevel.Warning),
-            InfoCount = logs.Count(x => x.Level == LogLevel.Information),
-            DebugCount = logs.Count(x => x.Level == LogLevel.Debug),
-            TraceCount = logs.Count(x => x.Level == LogLevel.Verbose),
-            LogsBySource = logs.GroupBy(x => x.Source).ToDictionary(g => g.Key, g => g.Count()),
-            LogsByHour = logs
-                .GroupBy(x => x.Timestamp.ToString("yyyy-MM-dd HH:00"))
-                .OrderByDescending(g => g.Key)
-                .Take(24)
-                .ToDictionary(g => g.Key, g => g.Count())
+            TotalLogs = total,
+            ErrorCount = errorCount,
+            WarningCount = warningCount,
+            InfoCount = infoCount,
+            DebugCount = debugCount,
+            TraceCount = traceCount
         };
     }
 
-    public async Task<List<TopErrorViewModel>> GetTopErrorsAsync(int limit = 10, DateTime? from = null, DateTime? to = null)
+    public async Task<List<TopErrorViewModel>> GetTopErrorsAsync(int limit, AdvancedSearchCriteria criteria)
     {
-        using var session = _documentStore.OpenAsyncSession();
-        var query = session.Query<LogEntity>()
-            .Where(x => x.LevelNumeric == (int)LogLevel.Error || x.LevelNumeric == (int)LogLevel.Fatal);
+        criteria.Page = 1;
+        criteria.PageSize = int.MaxValue;
 
-        if (from.HasValue) query = query.Where(x => x.Timestamp >= from);
-        if (to.HasValue) query = query.Where(x => x.Timestamp <= to);
+        var logs = await GetFilteredLogsAsync(criteria);
 
-        var entities = await query
-            .OrderByDescending(x => x.Timestamp)
-            .Take(WorkingSetSize)
-            .ToListAsync();
-
-        var errors = entities.Select(e => MapToViewModel(e, session)).ToList();
-
-        return errors
-            .GroupBy(x => x.Message)
-            .OrderByDescending(g => g.Count())
-            .Take(limit)
+        return logs
+            .Where(l => l.Level == LogLevel.Error || l.Level == LogLevel.Fatal)
+            .GroupBy(l => new { l.Message, l.Source })
             .Select(g => new TopErrorViewModel
             {
-                Message = g.Key,
-                Count = g.Count(),
-                Source = g.FirstOrDefault()?.Source ?? "Unknown"
+                Message = g.Key.Message,
+                Source = g.Key.Source,
+                Count = g.Count()
             })
+            .OrderByDescending(x => x.Count)
+            .Take(limit)
             .ToList();
     }
 
-    public async Task<TimeSeriesDataViewModel> GetTimeSeriesDataAsync(string timeRange = "24h")
+    public async Task<TimeSeriesDataViewModel> GetTimeSeriesDataAsync(AdvancedSearchCriteria criteria)
     {
-        try
+        criteria.Page = 1;
+        criteria.PageSize = int.MaxValue;
+
+        var logs = await GetFilteredLogsAsync(criteria);
+
+        // Elegimos la granularidad según el rango
+        var range = criteria.StartDate.HasValue
+            ? DateTime.UtcNow - criteria.StartDate.Value
+            : TimeSpan.FromHours(24);
+
+        var bucketSize = range.TotalHours switch
         {
-            var startDate = GetStartDateFromTimeRange(timeRange);
-            var (bucketFormat, bucketDuration) = GetBucketConfig(timeRange);
+            <= 2 => TimeSpan.FromMinutes(5),
+            <= 24 => TimeSpan.FromHours(1),
+            <= 168 => TimeSpan.FromHours(6),
+            _ => TimeSpan.FromDays(1)
+        };
 
-            using var session = _documentStore.OpenAsyncSession();
-            var entities = await session.Query<LogEntity>()
-                .Where(x => x.Timestamp >= startDate)
-                .OrderBy(x => x.Timestamp)
-                .ToListAsync();
+        var grouped = logs
+            .GroupBy(l => new DateTime(
+                l.Timestamp.Year, l.Timestamp.Month, l.Timestamp.Day,
+                l.Timestamp.Hour, l.Timestamp.Minute, 0, DateTimeKind.Local))
+            .OrderBy(g => g.Key)
+            .ToList();
 
-            var logs = entities.Select(e => MapToViewModel(e, session)).ToList();
-
-            // Generar buckets vacíos (incluyendo los que no tienen logs) para que la
-            // línea del tiempo quede continua, sin "saltos" entre huecos de datos.
-            var bucketKeys = new List<string>();
-            for (var t = startDate; t <= DateTime.UtcNow; t = t.Add(bucketDuration))
-                bucketKeys.Add(t.ToString(bucketFormat));
-
-            var lookup = logs
-                .GroupBy(x => x.Timestamp.ToString(bucketFormat))
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            return new TimeSeriesDataViewModel
-            {
-                Timestamps = bucketKeys,
-                ErrorCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == LogLevel.Error) : 0).ToList(),
-                WarningCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == LogLevel.Warning) : 0).ToList(),
-                InfoCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == LogLevel.Information) : 0).ToList(),
-                DebugCounts = bucketKeys.Select(k => lookup.TryGetValue(k, out var l) ? l.Count(x => x.Level == LogLevel.Debug) : 0).ToList()
-            };
-        }
-        catch (Exception ex)
+        return new TimeSeriesDataViewModel
         {
-            _logger.LogError(ex, "Error getting time series data");
-            return new TimeSeriesDataViewModel();
-        }
+            Timestamps = grouped.Select(g => g.Key.ToString("yyyy-MM-dd HH:mm")).ToList(),
+            ErrorCounts = grouped.Select(g => g.Count(x => x.Level == LogLevel.Error || x.Level == LogLevel.Fatal)).ToList(),
+            WarningCounts = grouped.Select(g => g.Count(x => x.Level == LogLevel.Warning)).ToList(),
+            InfoCounts = grouped.Select(g => g.Count(x => x.Level == LogLevel.Information)).ToList(),
+            DebugCounts = grouped.Select(g => g.Count(x => x.Level == LogLevel.Debug || x.Level == LogLevel.Verbose)).ToList()
+        };
     }
 
     private static (string format, TimeSpan duration) GetBucketConfig(string timeRange) => timeRange switch
