@@ -4,8 +4,6 @@ using LogsViewer.Services.Contracts;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Linq;
 using Raven.Client.Documents.Session;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using LogLevel = LogsViewer.Models.Filters.LogLevel;
 
 namespace LogsViewer.Services.Implementation;
@@ -23,16 +21,6 @@ public class LogService : ILogService
     // Ventana de trabajo para operaciones que agregan/agrupan en memoria
     // (RavenDB no puede agrupar cómodamente por campos derivados como "Source").
     private const int WorkingSetSize = 10000;
-
-    // Opciones usadas para serializar las propiedades del log a PropertiesJson.
-    // WriteIndented: salida legible en el <pre> de las vistas.
-    // UnsafeRelaxedJsonEscaping: mantiene tildes/ñ sin escapar (\u00f3 -> ó).
-    private static readonly JsonSerializerOptions PropertiesJsonOptions = new()
-    {
-        WriteIndented = true,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
 
     public LogService(IDocumentStore documentStore, ILogger<LogService> logger)
     {
@@ -271,9 +259,6 @@ public class LogService : ILogService
     /// <summary>
     /// Convierte una LogEntity (lo que realmente guarda LogWriter) al LogViewModel
     /// que consumen las vistas.
-    /// Aquí se serializan las propiedades a JSON (PropertiesJson): es la única
-    /// responsabilidad de serialización que necesitan las vistas/APIs, por lo que
-    /// ya no exponemos el diccionario Properties.
     /// </summary>
     private static LogViewModel MapToViewModel(LogEntity entity, IAsyncDocumentSession session)
     {
@@ -291,24 +276,19 @@ public class LogService : ILogService
             ? application
             : (sourceContext ?? machine ?? "Unknown");
 
-        // Propiedades -> JSON (lógica que antes estaba dispersa en controlador/vistas)
-        var properties = entity.Properties.ToDictionary(p => p.Name, p => (object)p.GetValueString());
-        var propertiesJson = properties.Any()
-            ? JsonSerializer.Serialize(properties, PropertiesJsonOptions)
-            : null;
 
         return new LogViewModel
         {
             Id = session.Advanced.GetDocumentId(entity) ?? string.Empty,
             Application = application,
-            SourceContext = sourceContext ?? "",
+            SourceContext = GetProp("SourceContext") ?? "",
             Timestamp = entity.Timestamp.LocalDateTime,
             Level = LogLevelExtensions.FromQueryString(entity.Level),
             Message = entity.Message,
             Source = source,
             Exception = entity.Exception,
             StackTrace = entity.Exception,
-            PropertiesJson = propertiesJson
+            Properties = entity.Properties.ToDictionary(p => p.Name, p => (object)p.GetValueString())
         };
     }
 

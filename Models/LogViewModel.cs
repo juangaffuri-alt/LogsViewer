@@ -12,15 +12,9 @@
 
         public string Source { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Propiedades del log ya serializadas como JSON.
-        /// Se genera en LogService (MapToViewModel), por lo que la vista/JS
-        /// no necesitan volver a serializar ni conocer el modelo de propiedades.
-        /// </summary>
-        public string? PropertiesJson { get; set; }
+        public Dictionary<string, object>? Properties { get; set; }
 
-        public bool HasProperties => !string.IsNullOrWhiteSpace(PropertiesJson)
-                                     && PropertiesJson != "{}";
+        public string? PropertiesJson { get; set; }
 
         public string? Exception { get; set; }
 
