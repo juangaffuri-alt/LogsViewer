@@ -19,26 +19,16 @@ public static class JsonHighlighter
 
         var sb = new StringBuilder(json.Length + 64);
         var inString = false;
-        var isKey = false;          // la string actual es clave (va antes del ':')
-        var numberStart = -1;
-        var literalStart = -1;      // true / false / null fuera de comas
+        var isKey = false;                // la string actual es clave (va antes del ':')
+        var token = new StringBuilder();  // número o literal "en curso" (sin emitir todavía)
 
-        void CloseNumber()
+        void CloseToken(string cssClass)
         {
-            if (numberStart < 0) return;
-            sb.Append("<span class=\"json-num\">")
-              .Append(System.Net.WebUtility.HtmlEncode(json.AsSpan(numberStart)))
+            if (token.Length == 0) return;
+            sb.Append("<span class=\"").Append(cssClass).Append("\">")
+              .Append(System.Net.WebUtility.HtmlEncode(token.ToString()))
               .Append("</span>");
-            numberStart = -1;
-        }
-
-        void CloseLiteral()
-        {
-            if (literalStart < 0) return;
-            sb.Append("<span class=\"json-lit\">")
-              .Append(System.Net.WebUtility.HtmlEncode(json.AsSpan(literalStart)))
-              .Append("</span>");
-            literalStart = -1;
+            token.Clear();
         }
 
         for (int i = 0; i < json.Length; i++)
@@ -50,13 +40,13 @@ public static class JsonHighlighter
                 // Cierre de string: puede venir escapada (\")
                 if (c == '"' && i > 0 && json[i - 1] != '\\')
                 {
-                    sb.Append(System.Net.WebUtility.HtmlEncode(json.AsSpan(i, 1)));
+                    sb.Append('"');
                     inString = false;
                     sb.Append("</span>");
                 }
                 else
                 {
-                    sb.Append(System.Net.WebUtility.HtmlEncode(json.AsSpan(i, 1)));
+                    sb.Append(System.Net.WebUtility.HtmlEncode(c.ToString()));
                 }
                 continue;
             }
@@ -64,51 +54,61 @@ public static class JsonHighlighter
             switch (c)
             {
                 case '"':
-                    CloseNumber();
-                    CloseLiteral();
-                    // ¿es clave? Miramos hacia atrás: si el último token relevante
-                    // es '{' o ',' entonces lo que sigue es una clave.
-                    isKey = LastSignificant(sb.ToString()) is '{' or ',' or "";
+                    CloseToken("json-num");
+                    CloseToken("json-lit");
+                    // ¿es clave? Si el último carácter relevante del JSON es
+                    // '{' o ',' (o estamos al principio), lo que sigue es una clave.
+                    isKey = LastSignificant(sb) is '{' or ',' or '[' or '\0';
                     inString = true;
-                    sb.Append(isKey ? "<span class=\"json-key\">\"" : "<span class=\"json-str\">\"");
+                    sb.Append(isKey ? "<span class=\"json-key\">" : "<span class=\"json-str\">");
                     break;
 
-                case >= '0' and <= '9' or '-' or '+':
-                    if (numberStart < 0 && !IsInsidePrevToken(json, i))
-                        numberStart = i;
-                    CloseLiteral();
-                    sb.Append(c);
+                case >= '0' and <= '9' or '-' or '+' or '.' or 'e' or 'E':
+                    if (token.Length == 0 && !IsPrevNumberChar(LastSignificant(sb)))
+                        CloseToken("json-lit");   // un dígito suelto no pertenece a un literal
+                    if (token.Length > 0 || char.IsDigit(c) || c == '-')
+                        token.Append(c);
+                    else
+                        sb.Append(c);            // '.'/exponente huérfanos fuera de número
                     break;
 
                 case 't' or 'f' or 'n':
-                    if (literalStart < 0) literalStart = i;
-                    CloseNumber();
-                    sb.Append(c);
+                    if (token.Length == 0 && !IsPrevNumberChar(LastSignificant(sb)))
+                        token.Append(c);
+                    else
+                        sb.Append(c);
                     break;
 
                 default:
-                    CloseNumber();
-                    CloseLiteral();
-                    sb.Append(System.Net.WebUtility.HtmlEncode(json.AsSpan(i, 1)));
+                    CloseToken("json-num");
+                    CloseToken("json-lit");
+                    sb.Append(System.Net.WebUtility.HtmlEncode(c.ToString()));
                     break;
             }
         }
 
-        CloseNumber();
-        CloseLiteral();
+        CloseToken("json-num");
+        CloseToken("json-lit");
         return new HtmlString(sb.ToString());
     }
 
-    private static char? LastSignificant(string s)
+    // Último carácter "relevante": recorre hacia atrás solo dentro del span
+    // recién cerrado (\"</span>\"); si hay más markup, devuelve '\"' (fin de string).
+    private static char LastSignificant(StringBuilder sb)
     {
-        for (int i = s.Length - 1; i >= 0; i--)
+        var n = sb.Length;
+        if (n >= 7)
         {
-            var ch = s[i];
-            if (!char.IsWhiteSpace(ch)) return ch;
+            // "</span>" ocupa las 7 últimas posiciones -> mirar antes de él
+            var endsWithClose = true;
+            for (int k = 0; k < 7; k++)
+                if (sb[n - 1 - k] != "</span>"[6 - k]) { endsWithClose = false; break; }
+            if (endsWithClose)
+                return sb[n - 8];
         }
-        return null;
+        return n == 0 ? '\0' : sb[n - 1];
     }
 
-    private static bool IsInsidePrevToken(string json, int i) =>
-        i > 0 && (char.IsDigit(json[i - 1]) || json[i - 1] == '.' || json[i - 1] == 'e' || json[i - 1] == 'E');
+    private static bool IsPrevNumberChar(char ch) =>
+        char.IsDigit(ch) || ch is '.' or 'e' or 'E' or '+' or '-';
 }
