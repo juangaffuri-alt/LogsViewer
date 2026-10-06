@@ -379,3 +379,24 @@
         margin-bottom: 1rem;
         display: block;
     }
+
+/* ===== JSON de propiedades con syntax highlighting (JsonHighlighter) ===== */
+pre.log-json {
+    background: #10151f;
+    color: #d8dee9;
+    border-radius: 6px;
+    padding: .75rem 1rem;
+    font-size: .78rem;
+    line-height: 1.45;
+    max-height: 320px;
+    overflow: auto;
+    margin: 0;
+}
+
+.json-key { color: #8be9fd; }
+.json-str { color: #a1efd3; }
+.json-num { color: #ffb86c; }
+.json-lit { color: #bd93f9; font-style: italic; }
+
+/* Timestamp relativo ("hace 3 min") con tooltip en el timestamp absoluto */
+.log-timestamp-relative { cursor: help; opacity: .85; }

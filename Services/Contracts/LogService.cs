@@ -333,9 +333,10 @@ public class LogService : ILogService
         LazyString? propertiesJson = null;
         if (entity.Properties != null && entity.Properties.Length > 0)
         {
+            var propsSnapshot = entity.Properties; // LogProperty[] inmutable: snapshot seguro para el lazy
             propertiesJson = new LazyString(() =>
             {
-                var properties = entity.Properties.ToDictionary(p => p.Name, p => (object?)p.GetValueString());
+                var properties = propsSnapshot.ToDictionary(p => p.Name, p => (object?)p.GetValueString());
                 return JsonSerializer.Serialize(properties, PropertiesJsonOptions);
             });
         }
