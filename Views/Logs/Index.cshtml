@@ -131,8 +131,7 @@
                             <tr class="log-details-row" id="@propsId" hidden>
                                 <td colspan="5">
                                     <div class="log-props-header">Propiedades</div>
-                                    <pre>@System.Text.Json.JsonSerializer.Serialize(log.Properties,
-                                        new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+                                    <pre>@log.PropertiesJson</pre>
                                 </td>
                             </tr>
                         }
@@ -175,8 +174,7 @@
                     {
                         <details class="log-details">
                             <summary>Propiedades</summary>
-                            <pre>@System.Text.Json.JsonSerializer.Serialize(log.Properties,
-                                new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+                            <pre>@log.PropertiesJson</pre>
                         </details>
                     }
                 </div>

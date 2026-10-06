@@ -14,6 +14,8 @@
 
         public Dictionary<string, object>? Properties { get; set; }
 
+        public string? PropertiesJson { get; set; }
+
         public string? Exception { get; set; }
 
         public string? StackTrace { get; set; }
