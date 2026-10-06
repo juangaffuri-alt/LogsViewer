@@ -1,6 +1,18 @@
 ﻿@model LogsPageViewModel
 @{
     ViewData["Title"] = "Logs - Logger Viewer";
+
+    // Timestamp relativo estilo Kibana/Datadog: "hace 3 min". El tooltip (title)
+    // y el atributo data-ts conservan el valor absoluto por si se quiere más precisión.
+    static string RelativeTime(DateTime ts)
+    {
+        var d = DateTime.Now - ts;
+        if (d.TotalSeconds < 0) return "ahora";
+        if (d.TotalSeconds < 60) return $"hace {(int)d.TotalSeconds} s";
+        if (d.TotalMinutes < 60) return $"hace {(int)d.TotalMinutes} min";
+        if (d.TotalHours < 24) return $"hace {(int)d.TotalHours} h";
+        return $"hace {(int)d.TotalDays} d";
+    }
 }
 
 <link rel="stylesheet" href="~/css/logs.css" asp-append-version="true" />
@@ -78,7 +90,9 @@
 
                         <tr class="log-row level-@level">
                             <td><span class="log-level @level">@log.Level.ToDisplay()</span></td>
-                            <td class="log-timestamp">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</td>
+                            <td class="log-timestamp" title="@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")">
+                                <span class="log-timestamp-relative" data-ts="@log.Timestamp.ToString("o")">@RelativeTime(log.Timestamp)</span>
+                            </td>
                             <td class="log-app">
                                 @HighlightHelper.Highlight(log.Application, Model.SearchQuery)
                             </td>
@@ -131,7 +145,7 @@
                             <tr class="log-details-row" id="@propsId" hidden>
                                 <td colspan="5">
                                     <div class="log-props-header">Propiedades</div>
-                                    <pre>@log.PropertiesJson</pre>
+                                    <pre class="log-json">@JsonHighlighter.Highlight(log.PropertiesJson)</pre>
                                 </td>
                             </tr>
                         }
@@ -151,7 +165,7 @@
                 <div class="log-card level-@level">
                     <div class="log-card-header">
                         <span class="log-level @level">@log.Level.ToDisplay()</span>
-                        <span class="log-timestamp">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</span>
+                        <span class="log-timestamp log-timestamp-relative" title="@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")" data-ts="@log.Timestamp.ToString("o")">@RelativeTime(log.Timestamp)</span>
                         <span class="log-source">
                             @HighlightHelper.Highlight(log.Source, Model.SearchQuery)
                         </span>
@@ -174,7 +188,7 @@
                     {
                         <details class="log-details">
                             <summary>Propiedades</summary>
-                            <pre>@log.PropertiesJson</pre>
+                            <pre class="log-json">@JsonHighlighter.Highlight(log.PropertiesJson)</pre>
                         </details>
                     }
                 </div>

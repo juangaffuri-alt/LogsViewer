@@ -18,6 +18,8 @@
             window.location.reload();
         });
 
+        this.startRelativeTimestamps();
+
         document.getElementById('btn-export')?.addEventListener('click', () => {
             this.exportCsv();
         });
@@ -57,6 +59,36 @@
         let mode = 'grid';
         try { mode = localStorage.getItem('logsViewMode') || 'grid'; } catch (e) { }
         this.setViewMode(mode);
+    },
+
+    // Mantiene actualizados los timestamps relativos ("hace 3 min") de la grilla
+    // y las tarjetas sin recargar la página. El valor absoluto queda en el title.
+    startRelativeTimestamps: function () {
+        const els = Array.from(document.querySelectorAll('.log-timestamp-relative[data-ts]'));
+        if (!els.length) return;
+
+        const fmt = (d) => {
+            const s = Math.floor(d / 1000);
+            if (s < 60) return `hace ${s} s`;
+            const m = Math.floor(s / 60);
+            if (m < 60) return `hace ${m} min`;
+            const h = Math.floor(m / 60);
+            if (h < 24) return `hace ${h} h`;
+            return `hace ${Math.floor(h / 24)} d`;
+        };
+
+        const tick = () => {
+            const now = Date.now();
+            for (const el of els) {
+                const ts = new Date(el.dataset.ts).getTime();
+                if (isNaN(ts)) continue;
+                const delta = now - ts;
+                el.textContent = delta < 0 ? 'ahora' : fmt(delta);
+            }
+        };
+
+        tick();
+        setInterval(tick, 30000);
     },
 
     exportCsv: function () {

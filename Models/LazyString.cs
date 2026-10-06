@@ -48,7 +48,13 @@ namespace LogsViewer.Models
         private sealed class LazyStringJsonConverter : JsonConverter<LazyString>
         {
             public override LazyString? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-                => reader.TokenType == JsonTokenType.Null ? null : new LazyString(() => reader.GetString());
+            {
+                if (reader.TokenType == JsonTokenType.Null) return null;
+                // Copiamos el string antes de salir del método: el Utf8JsonReader
+                // es un struct 'ref' y no puede capturarse dentro de un lambda.
+                var text = reader.GetString();
+                return new LazyString(() => text);
+            }
 
             public override void Write(Utf8JsonWriter writer, LazyString value, JsonSerializerOptions options)
             {

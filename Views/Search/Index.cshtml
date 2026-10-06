@@ -1,6 +1,11 @@
 ﻿@model SearchViewModel
 @{
     ViewData["Title"] = "Búsqueda - Logger Viewer";
+
+    // Solo se resuelven las propiedades de los primeros 100 resultados (los badges
+    // muestran como mucho 3 líneas por tarjeta). Evita serializar JSON de miles de
+    // logs que igual no se muestran.
+    var topResults = Model.Results.Take(100).ToList();
 }
 
 <div class="search-container">
@@ -69,7 +74,7 @@
             @if (Model.Results.Any())
             {
                 <div class="results-list">
-                    @foreach (var log in Model.Results)
+                    @foreach (var log in topResults)
                     {
                         <div class="log-card result-card">
                             <div class="log-header">
@@ -83,10 +88,11 @@
                             <div class="log-message">@log.Message</div>
                             @if (!string.IsNullOrWhiteSpace(log.PropertiesJson))
                             {
+                                var propsLines = log.PropertiesJson.Value!.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
                                 <div class="log-properties">
-                                    @foreach (var prop in log.PropertiesJson.Split(Environment.NewLine).Take(3))
+                                    @foreach (var prop in propsLines.Take(3))
                                     {
-                                        <span class="property-badge">@prop</span>
+                                        <span class="property-badge">@prop.Trim()</span>
                                     }
                                 </div>
                             }
