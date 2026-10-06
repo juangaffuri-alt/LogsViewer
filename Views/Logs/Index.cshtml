@@ -73,7 +73,7 @@
                         var log = Model.Logs[i];
                         var level = log.Level.ToQueryString().ToLower(); // o log.Level.ToString().ToLower()
                         var propsId = $"props-{i}";
-                        var hasProps = log.Properties != null && log.Properties.Any();
+                        var hasProps = log.HasProperties;
                         var hasException = !string.IsNullOrWhiteSpace(log.Exception);
 
                         <tr class="log-row level-@level">
@@ -131,8 +131,7 @@
                             <tr class="log-details-row" id="@propsId" hidden>
                                 <td colspan="5">
                                     <div class="log-props-header">Propiedades</div>
-                                    <pre>@System.Text.Json.JsonSerializer.Serialize(log.Properties,
-                                        new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+                                    <pre>@log.PropertiesJson</pre>
                                 </td>
                             </tr>
                         }
@@ -146,7 +145,7 @@
             @foreach (var log in Model.Logs)
             {
                 var level = log.Level.ToQueryString().ToLower(); // o log.Level.ToString().ToLower()
-                var hasProps = log.Properties != null && log.Properties.Any();
+                var hasProps = log.HasProperties;
                 var hasException = !string.IsNullOrWhiteSpace(log.Exception);
 
                 <div class="log-card level-@level">
@@ -175,8 +174,7 @@
                     {
                         <details class="log-details">
                             <summary>Propiedades</summary>
-                            <pre>@System.Text.Json.JsonSerializer.Serialize(log.Properties,
-                                new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+                            <pre>@log.PropertiesJson</pre>
                         </details>
                     }
                 </div>
