@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using System.Text;
-using System.Text.Json;
 
 namespace LogsViewer.Controllers;
 
@@ -50,18 +49,10 @@ public class LogsController : Controller
         try
         {
             var criteria = BuildCriteria(model);
-            var logs = await _logService.AdvancedSearchAsync(criteria);
-            var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
-            foreach (var log in logs)
-            {
-                if (log.Properties != null && log.Properties.Any())
-                {
-                    log.PropertiesJson = JsonSerializer.Serialize(log.Properties, jsonOptions);
-                }
-            }
-            model.Logs = logs;
+            // El LogService ya trae las propiedades serializadas en PropertiesJson.
+            model.Logs = await _logService.AdvancedSearchAsync(criteria);
             model.TotalCount = await _logService.AdvancedSearchCountAsync(criteria);
-            
+
             return View(model);
         }
         catch (Exception ex)

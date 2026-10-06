@@ -4,6 +4,7 @@ using LogsViewer.Services.Contracts;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Linq;
 using Raven.Client.Documents.Session;
+using System.Text.Json;
 using LogLevel = LogsViewer.Models.Filters.LogLevel;
 
 namespace LogsViewer.Services.Implementation;
@@ -17,6 +18,9 @@ public class LogService : ILogService
 {
     private readonly IDocumentStore _documentStore;
     private readonly ILogger<LogService> _logger;
+
+    // Serialización de las propiedades de cada log hacia PropertiesJson.
+    private static readonly JsonSerializerOptions PropertiesJsonOptions = new() { WriteIndented = true };
 
     // Ventana de trabajo para operaciones que agregan/agrupan en memoria
     // (RavenDB no puede agrupar cómodamente por campos derivados como "Source").
@@ -276,6 +280,14 @@ public class LogService : ILogService
             ? application
             : (sourceContext ?? machine ?? "Unknown");
 
+        // Serializamos las propiedades directo a PropertiesJson: el resto de la
+        // aplicación ya no necesita la colección cruda de propiedades.
+        string? propertiesJson = null;
+        if (entity.Properties != null && entity.Properties.Length > 0)
+        {
+            var properties = entity.Properties.ToDictionary(p => p.Name, p => (object?)p.GetValueString());
+            propertiesJson = JsonSerializer.Serialize(properties, PropertiesJsonOptions);
+        }
 
         return new LogViewModel
         {
@@ -288,7 +300,7 @@ public class LogService : ILogService
             Source = source,
             Exception = entity.Exception,
             StackTrace = entity.Exception,
-            Properties = entity.Properties.ToDictionary(p => p.Name, p => (object)p.GetValueString())
+            PropertiesJson = propertiesJson
         };
     }
 

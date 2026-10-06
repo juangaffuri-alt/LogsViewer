@@ -81,14 +81,12 @@
                                 <span class="log-source">@log.Source</span>
                             </div>
                             <div class="log-message">@log.Message</div>
-                            @if (log.Properties?.Any() ?? false)
+                            @if (!string.IsNullOrWhiteSpace(log.PropertiesJson))
                             {
                                 <div class="log-properties">
-                                    @foreach (var prop in log.Properties.Take(3))
+                                    @foreach (var prop in log.PropertiesJson.Split(Environment.NewLine).Take(3))
                                     {
-                                        <span class="property-badge">
-                                            <strong>@prop.Key:</strong> @prop.Value
-                                        </span>
+                                        <span class="property-badge">@prop</span>
                                     }
                                 </div>
                             }
