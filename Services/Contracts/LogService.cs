@@ -4,6 +4,7 @@ using LogsViewer.Services.Contracts;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Linq;
 using Raven.Client.Documents.Session;
+using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
 using LogLevel = LogsViewer.Models.Filters.LogLevel;
 
@@ -18,6 +19,7 @@ public class LogService : ILogService
 {
     private readonly IDocumentStore _documentStore;
     private readonly ILogger<LogService> _logger;
+    private readonly IMemoryCache _memoryCache;
 
     // Serialización de las propiedades de cada log hacia PropertiesJson.
     private static readonly JsonSerializerOptions PropertiesJsonOptions = new() { WriteIndented = true };
@@ -26,10 +28,15 @@ public class LogService : ILogService
     // (RavenDB no puede agrupar cómodamente por campos derivados como "Source").
     private const int WorkingSetSize = 10000;
 
-    public LogService(IDocumentStore documentStore, ILogger<LogService> logger)
+    // Límites de seguridad: nunca pedir páginas gigantes ni contar working sets completos.
+    private const int MaxPageSize = 200;
+    private const int CountCacheTtlSeconds = 30;
+
+    public LogService(IDocumentStore documentStore, ILogger<LogService> logger, IMemoryCache memoryCache)
     {
         _documentStore = documentStore;
         _logger = logger;
+        _memoryCache = memoryCache;
     }
 
     public async Task<List<LogViewModel>> GetLogsAsync(int page = 1, int pageSize = 50)
@@ -68,11 +75,15 @@ public class LogService : ILogService
 
     public async Task<List<LogViewModel>> GetRecentLogsAsync(int count, AdvancedSearchCriteria criteria)
     {
+        // Solo la página 1 con los primeros "count": el stream hace Take en RavenDB
+        // y deja de leer en cuanto se completan (antes traía 10.000 documentos).
         criteria.Page = 1;
-        criteria.PageSize = count;
+        criteria.PageSize = Math.Clamp(count, 1, MaxPageSize);
 
-        var logs = await GetFilteredLogsAsync(criteria);
-        return logs.ToList(); // GetFilteredLogsAsync ya ordena por Timestamp descendente
+        var logs = new List<LogViewModel>(criteria.PageSize);
+        await foreach (var log in StreamFilteredLogsAsync(criteria))
+            logs.Add(log);
+        return logs;
     }
 
     public async Task<List<LogViewModel>> SearchLogsAsync(string query)
@@ -102,18 +113,41 @@ public class LogService : ILogService
 
     public async Task<LogStatisticsViewModel> GetStatisticsAsync(AdvancedSearchCriteria criteria)
     {
-        // Traemos un batch grande sin paginar para calcular stats
-        criteria.Page = 1;
-        criteria.PageSize = int.MaxValue;
+        // El dashboard pide stats + timeSeries + topErrors en cada request: cacheamos
+        // brevemente por criterios para no escanear el working set 3 veces por golpe.
+        return await _memoryCache.GetOrCreateAsync(
+            BuildCountCacheKey(criteria) + "|stats",
+            async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(CountCacheTtlSeconds);
+                return await ComputeStatisticsAsync(criteria);
+            }) ?? new LogStatisticsViewModel();
+    }
 
-        var logs = await GetFilteredLogsAsync(criteria);
-        var total = logs.Count;
+    private async Task<LogStatisticsViewModel> ComputeStatisticsAsync(AdvancedSearchCriteria criteria)
+    {
+        // Contamos por niveles con una sola pasada (antes se recorría la lista 5 veces)
+        // y solo extraemos el Level: no mapeamos el view model ni serializamos propiedades.
+        var errorCount = 0;
+        var warningCount = 0;
+        var infoCount = 0;
+        var debugCount = 0;
+        var traceCount = 0;
+        var total = 0;
 
-        var errorCount = logs.Count(l => l.Level == LogLevel.Error || l.Level == LogLevel.Fatal);
-        var warningCount = logs.Count(l => l.Level == LogLevel.Warning);
-        var infoCount = logs.Count(l => l.Level == LogLevel.Information);
-        var debugCount = logs.Count(l => l.Level == LogLevel.Debug);
-        var traceCount = logs.Count(l => l.Level == LogLevel.Verbose);
+        await foreach (var e in StreamMatchingEntitiesAsync(criteria))
+        {
+            total++;
+            switch (LogLevelExtensions.FromQueryString(e.Level))
+            {
+                case LogLevel.Error:
+                case LogLevel.Fatal: errorCount++; break;
+                case LogLevel.Warning: warningCount++; break;
+                case LogLevel.Information: infoCount++; break;
+                case LogLevel.Debug: debugCount++; break;
+                case LogLevel.Verbose: traceCount++; break;
+            }
+        }
 
         return new LogStatisticsViewModel
         {
@@ -128,71 +162,73 @@ public class LogService : ILogService
 
     public async Task<List<TopErrorViewModel>> GetTopErrorsAsync(int limit, AdvancedSearchCriteria criteria)
     {
-        criteria.Page = 1;
-        criteria.PageSize = int.MaxValue;
+        // Solo nos interesan los errores: agrupamos en un diccionario durante una
+        // sola pasada, sin materializar listas intermedias de 10.000 view models.
+        var groups = new Dictionary<(string Message, string Source), int>();
 
-        var logs = await GetFilteredLogsAsync(criteria);
+        await foreach (var e in StreamMatchingEntitiesAsync(criteria))
+        {
+            var level = LogLevelExtensions.FromQueryString(e.Level);
+            if (level != LogLevel.Error && level != LogLevel.Fatal)
+                continue;
 
-        return logs
-            .Where(l => l.Level == LogLevel.Error || l.Level == LogLevel.Fatal)
-            .GroupBy(l => new { l.Message, l.Source })
-            .Select(g => new TopErrorViewModel
-            {
-                Message = g.Key.Message,
-                Source = g.Key.Source,
-                Count = g.Count()
-            })
-            .OrderByDescending(x => x.Count)
+            var source = DeriveSource(e);
+            var key = (e.Message ?? string.Empty, source);
+            groups[key] = groups.TryGetValue(key, out var count) ? count + 1 : 1;
+        }
+
+        return groups
+            .OrderByDescending(kv => kv.Value)
             .Take(limit)
+            .Select(kv => new TopErrorViewModel
+            {
+                Message = kv.Key.Message,
+                Source = kv.Key.Source,
+                Count = kv.Value
+            })
             .ToList();
     }
 
     public async Task<TimeSeriesDataViewModel> GetTimeSeriesDataAsync(AdvancedSearchCriteria criteria)
     {
-        criteria.Page = 1;
-        criteria.PageSize = int.MaxValue;
-
-        var logs = await GetFilteredLogsAsync(criteria);
-
         // Elegimos la granularidad según el rango
         var range = criteria.StartDate.HasValue
             ? DateTime.UtcNow - criteria.StartDate.Value
             : TimeSpan.FromHours(24);
 
-        var bucketSize = range.TotalHours switch
-        {
-            <= 2 => TimeSpan.FromMinutes(5),
-            <= 24 => TimeSpan.FromHours(1),
-            <= 168 => TimeSpan.FromHours(6),
-            _ => TimeSpan.FromDays(1)
-        };
+        // Agrupamos en un diccionario durante una sola pasada (antes se recorria
+        // la lista completa varias veces entre GroupBy y los 4 Count()).
+        var buckets = new SortedDictionary<DateTime, int[]>(); // [error, warning, info, debug]
 
-        var grouped = logs
-            .GroupBy(l => new DateTime(
-                l.Timestamp.Year, l.Timestamp.Month, l.Timestamp.Day,
-                l.Timestamp.Hour, l.Timestamp.Minute, 0, DateTimeKind.Local))
-            .OrderBy(g => g.Key)
-            .ToList();
+        await foreach (var e in StreamMatchingEntitiesAsync(criteria))
+        {
+            var local = e.Timestamp.LocalDateTime;
+            var key = new DateTime(local.Year, local.Month, local.Day,
+                local.Hour, local.Minute, 0, DateTimeKind.Local);
+
+            if (!buckets.TryGetValue(key, out var counts))
+                buckets[key] = counts = new int[4];
+
+            switch (LogLevelExtensions.FromQueryString(e.Level))
+            {
+                case LogLevel.Error:
+                case LogLevel.Fatal: counts[0]++; break;
+                case LogLevel.Warning: counts[1]++; break;
+                case LogLevel.Information: counts[2]++; break;
+                default: counts[3]++; break; // Debug + Verbose
+            }
+        }
 
         return new TimeSeriesDataViewModel
         {
-            Timestamps = grouped.Select(g => g.Key.ToString("yyyy-MM-dd HH:mm")).ToList(),
-            ErrorCounts = grouped.Select(g => g.Count(x => x.Level == LogLevel.Error || x.Level == LogLevel.Fatal)).ToList(),
-            WarningCounts = grouped.Select(g => g.Count(x => x.Level == LogLevel.Warning)).ToList(),
-            InfoCounts = grouped.Select(g => g.Count(x => x.Level == LogLevel.Information)).ToList(),
-            DebugCounts = grouped.Select(g => g.Count(x => x.Level == LogLevel.Debug || x.Level == LogLevel.Verbose)).ToList()
+            Timestamps = buckets.Keys.Select(k => k.ToString("yyyy-MM-dd HH:mm")).ToList(),
+            ErrorCounts = buckets.Values.Select(v => v[0]).ToList(),
+            WarningCounts = buckets.Values.Select(v => v[1]).ToList(),
+            InfoCounts = buckets.Values.Select(v => v[2]).ToList(),
+            DebugCounts = buckets.Values.Select(v => v[3]).ToList()
         };
     }
 
-    private static (string format, TimeSpan duration) GetBucketConfig(string timeRange) => timeRange switch
-    {
-        "15m" => ("yyyy-MM-dd HH:mm", TimeSpan.FromMinutes(1)),
-        "1h" => ("yyyy-MM-dd HH:mm", TimeSpan.FromMinutes(5)),
-        "24h" => ("yyyy-MM-dd HH:00", TimeSpan.FromHours(1)),
-        "7d" => ("yyyy-MM-dd HH:00", TimeSpan.FromHours(6)),
-        "30d" => ("yyyy-MM-dd", TimeSpan.FromDays(1)),
-        _ => ("yyyy-MM-dd HH:00", TimeSpan.FromHours(1))
-    };
 
     
     public async Task<List<LogViewModel>> GetLogsByLevelAsync(string level, int limit = 100)
@@ -245,13 +281,20 @@ public class LogService : ILogService
     {
         try
         {
-            var logs = await GetFilteredLogsAsync(criteria);
+            // Normalizamos la paginación: nunca páginas gigantes (el pageSize llegaba
+            // directo desde el querystring y se usaba en Skip/Take sin validar).
+            var page = Math.Max(1, criteria.Page);
+            var pageSize = Math.Clamp(criteria.PageSize <= 0 ? 50 : criteria.PageSize, 1, MaxPageSize);
+            criteria.Page = page;
+            criteria.PageSize = pageSize;
 
-            return logs
-                .OrderByDescending(x => x.Timestamp)
-                .Skip((criteria.Page - 1) * criteria.PageSize)
-                .Take(criteria.PageSize)
-                .ToList();
+            // Paginado ANTES de mapear: solo construimos los view models de la página
+            // actual (y por tanto solo serializamos esas PropertiesJson), no los
+            // ~10.000 del working set.
+            return await StreamFilteredLogsAsync(criteria)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
         }
         catch (Exception ex)
         {
@@ -261,39 +304,47 @@ public class LogService : ILogService
     }
 
     /// <summary>
+    /// Deriva el "Source" de la entidad: Application por defecto; si no hay
+    /// application, usa SourceContext o MachineName.
+    /// </summary>
+    private static string DeriveSource(LogEntity e)
+    {
+        var app = GetApplication(e);
+        return app != "Unknown"
+            ? app
+            : (GetProperty(e, "SourceContext") ?? GetProperty(e, "MachineName") ?? "Unknown");
+    }
+
+    /// <summary>
     /// Convierte una LogEntity (lo que realmente guarda LogWriter) al LogViewModel
     /// que consumen las vistas.
     /// </summary>
     private static LogViewModel MapToViewModel(LogEntity entity, IAsyncDocumentSession session)
     {
-        string? GetProp(params string[] names) => entity.Properties
-            .Where(p => names.Contains(p.Name))
-            .Select(p => p.GetValueString())
-            .FirstOrDefault(v => !string.IsNullOrEmpty(v));
-
-        var application = GetProp("Application") ?? "Unknown";
-        var sourceContext = GetProp("SourceContext");
-        var machine = GetProp("MachineName");
+        var application = GetApplication(entity);
+        var sourceContext = GetProperty(entity, "SourceContext");
 
         // Source = Application por defecto; si querés la clase, cambiá esta línea.
-        var source = application != "Unknown"
-            ? application
-            : (sourceContext ?? machine ?? "Unknown");
+        var source = DeriveSource(entity);
 
-        // Serializamos las propiedades directo a PropertiesJson: el resto de la
-        // aplicación ya no necesita la colección cruda de propiedades.
-        string? propertiesJson = null;
+        // Serializamos las propiedades directo a PropertiesJson de forma perezosa:
+        // el JSON se genera solo si alguien lo lee (la vista paginada o una API),
+        // no para los ~10.000 logs del working set que nunca se muestran.
+        LazyString? propertiesJson = null;
         if (entity.Properties != null && entity.Properties.Length > 0)
         {
-            var properties = entity.Properties.ToDictionary(p => p.Name, p => (object?)p.GetValueString());
-            propertiesJson = JsonSerializer.Serialize(properties, PropertiesJsonOptions);
+            propertiesJson = new LazyString(() =>
+            {
+                var properties = entity.Properties.ToDictionary(p => p.Name, p => (object?)p.GetValueString());
+                return JsonSerializer.Serialize(properties, PropertiesJsonOptions);
+            });
         }
 
         return new LogViewModel
         {
             Id = session.Advanced.GetDocumentId(entity) ?? string.Empty,
             Application = application,
-            SourceContext = GetProp("SourceContext") ?? "",
+            SourceContext = sourceContext ?? "",
             Timestamp = entity.Timestamp.LocalDateTime,
             Level = LogLevelExtensions.FromQueryString(entity.Level),
             Message = entity.Message,
@@ -304,42 +355,20 @@ public class LogService : ILogService
         };
     }
 
-    /// <summary>
-    /// Mapea el LogLevel numérico (seteado por ClefParser) a los buckets
-    /// ERROR/WARNING/INFO/DEBUG/TRACE que usan las estadísticas y filtros.
-    /// </summary>
-    private static string MapLevelBucket(int levelNumeric) => (LogLevel)levelNumeric switch
-    {
-
-        LogLevel.Debug => "DEBUG",
-        LogLevel.Information => "INFO",
-        LogLevel.Warning => "WARNING",
-        LogLevel.Error => "ERROR",
-        LogLevel.Fatal => "FATAL",
-        _ => "INFO"
-    };
-
-    /// <summary>
-    /// Convierte rango de tiempo a fecha de inicio
-    /// </summary>
-    private DateTime GetStartDateFromTimeRange(string timeRange)
-    {
-        return timeRange switch
-        {
-            "15m" => DateTime.UtcNow.AddMinutes(-15),
-            "1h" => DateTime.UtcNow.AddHours(-1),
-            "24h" => DateTime.UtcNow.AddHours(-24),
-            "7d" => DateTime.UtcNow.AddDays(-7),
-            "30d" => DateTime.UtcNow.AddDays(-30),
-            _ => DateTime.UtcNow.AddHours(-24)
-        };
-    }
     public async Task<int> AdvancedSearchCountAsync(AdvancedSearchCriteria criteria)
     {
         try
         {
-            var logs = await GetFilteredLogsAsync(criteria);
-            return logs.Count;
+            // Contamos sobre el stream filtrado sin materializar los view models de los
+            // 10.000 logs; además cacheamos brevemente porque Index/SearchLogs pedían
+            // la cuenta en cada request (y en el mismo request, junto a los resultados).
+            return await _memoryCache.GetOrCreateAsync(
+                BuildCountCacheKey(criteria),
+                async entry =>
+                {
+                    entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(CountCacheTtlSeconds);
+                    return (int?)await CountFilteredLogsAsync(criteria);
+                }) ?? 0;
         }
         catch (Exception ex)
         {
@@ -348,14 +377,75 @@ public class LogService : ILogService
         }
     }
 
+    private string BuildCountCacheKey(AdvancedSearchCriteria criteria) =>
+        $"logcount|{criteria.Application}|{criteria.Query}|{string.Join(",", criteria.Levels.OrderBy(l => l.ToString()))}" +
+        $"|{string.Join(",", criteria.Sources.OrderBy(s => s))}|{criteria.StartDate:O}|{criteria.EndDate:O}";
+
     /// <summary>
-    /// Aplica todos los filtros de AdvancedSearchCriteria (menos paginado) y devuelve
-    /// la lista completa resultante. Compartido entre AdvancedSearchAsync y AdvancedSearchCountAsync
-    /// para que la cuenta y los resultados paginados siempre sean consistentes entre sí.
+    /// Cuenta los logs que matchean los criterios sobre las entidades crudas
+    /// (sin construir LogViewModel ni PropertiesJson), con cache breve de 30s.
     /// </summary>
-    private async Task<List<LogViewModel>> GetFilteredLogsAsync(AdvancedSearchCriteria criteria)
+    private async ValueTask<int> CountFilteredLogsAsync(AdvancedSearchCriteria criteria)
+    {
+        var count = 0;
+        await foreach (var _ in StreamMatchingEntitiesAsync(criteria))
+            count++;
+        return count;
+    }
+
+    /// <summary>
+    /// Stream perezoso de los logs filtrados (ordenados por Timestamp desc.).
+    /// No materializa la lista completa: quien consume puede Stop early (paginado,
+    /// Take, etc.) y el mapeo/serialización solo ocurre para los elementos leídos.
+    /// </summary>
+    private async IAsyncEnumerable<LogViewModel> StreamFilteredLogsAsync(AdvancedSearchCriteria criteria)
     {
         using var session = _documentStore.OpenAsyncSession();
+        var query = BuildEntityQuery(session, criteria);
+
+        var selectedLevels = criteria.Levels.Any() ? criteria.Levels.ToHashSet() : null;
+        var sources = criteria.Sources.Any() ? criteria.Sources.ToHashSet(StringComparer.Ordinal) : null;
+        var application = string.IsNullOrWhiteSpace(criteria.Application) ? null : criteria.Application.Trim();
+        var text = string.IsNullOrWhiteSpace(criteria.Query) ? null : criteria.Query.Trim();
+
+        // Paginamos en el servidor: para requests de página pedimos solo hasta el
+        // final de esa página, en vez de traer 10.000 documentos para descartarlos.
+        // Para streams de conteo/agrupación (PageSize <= 0) usamos el working set completo.
+        var take = criteria.PageSize > 0
+            ? Math.Min(WorkingSetSize, Math.Max(1, criteria.Page) * Math.Clamp(criteria.PageSize, 1, MaxPageSize))
+            : WorkingSetSize;
+
+        await using var enumerator = ((IAsyncEnumerable<LogEntity>)query.Take(take)).GetAsyncEnumerator();
+
+        while (await enumerator.MoveNextAsync())
+        {
+            var e = enumerator.Current;
+            var vm = MapToViewModel(e, session);
+
+            if (selectedLevels != null && !selectedLevels.Contains(vm.Level))
+                continue;
+
+            if (application != null && !string.Equals(vm.Application, application, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (sources != null && !sources.Contains(vm.Source))
+                continue;
+
+            if (text != null &&
+                !vm.Message.Contains(text, StringComparison.OrdinalIgnoreCase) &&
+                !vm.Source.Contains(text, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            yield return vm;
+        }
+    }
+
+    /// <summary>
+    /// Aplica al query de RavenDB los filtros indexables (rango de fechas) y deja
+    /// el resto (texto, niveles, application, sources) para el filtrado fino en memoria.
+    /// </summary>
+    private static IRavenQueryable<LogEntity> BuildEntityQuery(IAsyncDocumentSession session, AdvancedSearchCriteria criteria)
+    {
         IRavenQueryable<LogEntity> query = session.Query<LogEntity>();
 
         if (criteria.StartDate.HasValue)
@@ -363,48 +453,79 @@ public class LogService : ILogService
         if (criteria.EndDate.HasValue)
             query = query.Where(x => x.Timestamp <= criteria.EndDate);
 
-        var entities = await query
-            .OrderByDescending(x => x.Timestamp)
-            .Take(WorkingSetSize)
-            .ToListAsync();
-
-        foreach (var e in entities.Take(5))
-        {
-            _logger.LogInformation("Log crudo: Level={Level}, LevelNumeric={Num}",
-                e.Level, e.LevelNumeric);
-        }
-
-        var logs = entities.Select(e => MapToViewModel(e, session)).AsEnumerable();
-
-        _logger.LogInformation("Filtro: Query={Query}, Application={App}, Levels={Levels}, Logs antes={Count}",
-    criteria.Query, criteria.Application, string.Join(",", criteria.Levels), logs.Count());
-
-        if (!string.IsNullOrWhiteSpace(criteria.Query))
-        {
-            logs = logs.Where(x =>
-                x.Message.Contains(criteria.Query, StringComparison.OrdinalIgnoreCase) ||
-                x.Source.Contains(criteria.Query, StringComparison.OrdinalIgnoreCase));
-        }
-
-        _logger.LogInformation("Filtro aplicado: {Count} logs después", logs.Count());
-
-        if (criteria.Levels.Any())
-        {
-            var selected = criteria.Levels.ToHashSet();
-            logs = logs.Where(x =>
-                selected.Contains(LogLevelExtensions.FromQueryString(x.Level.ToQueryString())));
-        }
-
-        if (criteria.Sources.Any())
-            logs = logs.Where(x => criteria.Sources.Contains(x.Source));
-
-        // 👇 NUEVO
-        if (!string.IsNullOrWhiteSpace(criteria.Application))
-            logs = logs.Where(x => string.Equals(
-                x.Application, criteria.Application, StringComparison.OrdinalIgnoreCase));
-
-        return logs.ToList();
+        return query.OrderByDescending(x => x.Timestamp);
     }
+
+    private static string? GetProperty(LogEntity entity, string name) => entity.Properties
+        .Where(p => p.Name == name)
+        .Select(p => p.GetValueString())
+        .FirstOrDefault(v => !string.IsNullOrEmpty(v));
+
+    private static string GetApplication(LogEntity entity) => GetProperty(entity, "Application") ?? "Unknown";
+
+    /// <summary>
+    /// Filtro común: decide si una entidad cruda matchea los niveles/application/sources
+    /// pedidos. Devuelve el Source calculado o null si no matchea.
+    /// </summary>
+    private static string? MatchesFilters(
+        LogEntity e,
+        HashSet<LogLevel>? selectedLevels,
+        HashSet<string>? sources,
+        string? application,
+        out LogLevel level)
+    {
+        level = LogLevelExtensions.FromQueryString(e.Level);
+        if (selectedLevels != null && !selectedLevels.Contains(level))
+            return null;
+
+        var app = GetApplication(e);
+        if (application != null && !string.Equals(app, application, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var source = app != "Unknown" ? app : (GetProperty(e, "SourceContext") ?? GetProperty(e, "MachineName") ?? "Unknown");
+        if (sources != null && !sources.Contains(source))
+            return null;
+
+        return source;
+    }
+
+    /// <summary>
+    /// Stream perezoso de las entidades que matchean los criterios (incluido el filtro
+    /// de texto sobre Message/Source). Lo usan conteos y agrupaciones: cero view models,
+    /// cero JSON de propiedades.
+    /// </summary>
+    private async IAsyncEnumerable<LogEntity> StreamMatchingEntitiesAsync(AdvancedSearchCriteria criteria)
+    {
+        using var session = _documentStore.OpenAsyncSession();
+        var query = BuildEntityQuery(session, criteria);
+
+        var selectedLevels = criteria.Levels.Any() ? criteria.Levels.ToHashSet() : null;
+        var sources = criteria.Sources.Any() ? criteria.Sources.ToHashSet(StringComparer.Ordinal) : null;
+        var application = string.IsNullOrWhiteSpace(criteria.Application) ? null : criteria.Application.Trim();
+        var text = string.IsNullOrWhiteSpace(criteria.Query) ? null : criteria.Query.Trim();
+
+        await using var enumerator = ((IAsyncEnumerable<LogEntity>)query.Take(WorkingSetSize)).GetAsyncEnumerator();
+
+        while (await enumerator.MoveNextAsync())
+        {
+            var e = enumerator.Current;
+            var source = MatchesFilters(e, selectedLevels, sources, application, out _);
+            if (source is null)
+                continue;
+
+            if (text != null)
+            {
+                var message = e.Message ?? string.Empty;
+                if (!message.Contains(text, StringComparison.OrdinalIgnoreCase) &&
+                    !source.Contains(text, StringComparison.OrdinalIgnoreCase))
+                    continue;
+            }
+
+            yield return e;
+        }
+    }
+
+
     public async Task<List<string>> GetDistinctApplicationsAsync()
     {
         try
@@ -415,8 +536,10 @@ public class LogService : ILogService
                 .Take(WorkingSetSize)
                 .ToListAsync();
 
+            // Solo necesitamos el Application: no mapeamos el view model completo
+            // ni construimos el JSON de propiedades de cada log.
             return entities
-                .Select(e => MapToViewModel(e, session).Application)
+                .Select(GetApplication)
                 .Where(a => !string.IsNullOrEmpty(a) && a != "Unknown")
                 .Distinct()
                 .OrderBy(a => a)
