@@ -73,7 +73,7 @@
                         var log = Model.Logs[i];
                         var level = log.Level.ToQueryString().ToLower(); // o log.Level.ToString().ToLower()
                         var propsId = $"props-{i}";
-                        var hasProps = log.Properties != null && log.Properties.Any();
+                        var hasProps = log.HasProperties;
                         var hasException = !string.IsNullOrWhiteSpace(log.Exception);
 
                         <tr class="log-row level-@level">
@@ -145,7 +145,7 @@
             @foreach (var log in Model.Logs)
             {
                 var level = log.Level.ToQueryString().ToLower(); // o log.Level.ToString().ToLower()
-                var hasProps = log.Properties != null && log.Properties.Any();
+                var hasProps = log.HasProperties;
                 var hasException = !string.IsNullOrWhiteSpace(log.Exception);
 
                 <div class="log-card level-@level">
