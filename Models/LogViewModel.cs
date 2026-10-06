@@ -12,8 +12,6 @@
 
         public string Source { get; set; } = string.Empty;
 
-        public Dictionary<string, object>? Properties { get; set; }
-
         public string? PropertiesJson { get; set; }
 
         public string? Exception { get; set; }
