@@ -12,7 +12,12 @@
 
         public string Source { get; set; } = string.Empty;
 
-        public string? PropertiesJson { get; set; }
+        /// <summary>
+        /// JSON con las propiedades del log. Es "perezoso": solo se serializa
+        /// cuando alguien lo lee (la vista o el Json() de una API), no para
+        /// los ~10.000 logs del working set que nunca se muestran.
+        /// </summary>
+        public LazyString? PropertiesJson { get; set; }
 
         public string? Exception { get; set; }
 

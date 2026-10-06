@@ -25,6 +25,7 @@ builder.Services.AddHostedService<StartupJobHostingService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddOauthBPNAuthentication(builder.Configuration);
 builder.Services.AddScoped<LogFilterPreferencesService>();
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<ILogService, LogService>();
 
 var app = builder.Build();
