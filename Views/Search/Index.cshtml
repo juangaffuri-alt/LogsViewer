@@ -81,12 +81,16 @@
                                 <span class="log-source">@log.Source</span>
                             </div>
                             <div class="log-message">@log.Message</div>
-                            @if (log.HasProperties)
+                            @if (log.Properties?.Any() ?? false)
                             {
-                                <details class="log-details">
-                                    <summary>Propiedades</summary>
-                                    <pre>@log.PropertiesJson</pre>
-                                </details>
+                                <div class="log-properties">
+                                    @foreach (var prop in log.Properties.Take(3))
+                                    {
+                                        <span class="property-badge">
+                                            <strong>@prop.Key:</strong> @prop.Value
+                                        </span>
+                                    }
+                                </div>
                             }
                         </div>
                     }
